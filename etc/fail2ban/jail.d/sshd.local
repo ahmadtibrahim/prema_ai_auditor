@@ -1,0 +1,8 @@
+[sshd]
+backend     = polling
+journalmatch=
+enabled     = true
+filter      = sshd
+logpath     = /var/log/auth.log
+action      = nftables-multiport[name=sshd, port="22", protocol=tcp]
+              banned_db[name=sshd, port="22", protocol=tcp]

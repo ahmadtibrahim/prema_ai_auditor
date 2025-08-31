@@ -1,0 +1,9 @@
+[pregreet]
+backend     = polling
+journalmatch=
+enabled     = true
+maxretry    = 1
+filter      = postfix-pregreet.iredmail
+logpath     = /var/log/mail.log
+action      = nftables-multiport[name=pregreet, port="80,443,25,587,465,110,995,143,993,4190", protocol=tcp]
+              banned_db[name=pregreet, port="80,443,25,587,465,110,995,143,993,4190", protocol=tcp]

@@ -1,0 +1,5 @@
+hosts       = 127.0.0.1:3306
+user        = vmail
+password    = p2tyKAEVVLq4ZENS0LmLeNbbK6Xq2Jy6
+dbname      = vmail
+query       = SELECT domain FROM domain WHERE domain='%s' AND backupmx=1 AND active=1 LIMIT 1

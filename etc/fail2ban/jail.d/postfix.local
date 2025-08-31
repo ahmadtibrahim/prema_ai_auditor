@@ -1,0 +1,8 @@
+[postfix]
+backend     = polling
+journalmatch=
+enabled     = true
+filter      = postfix.iredmail
+logpath     = /var/log/mail.log
+action      = nftables-multiport[name=postfix, port="80,443,25,587,465,110,995,143,993,4190", protocol=tcp]
+              banned_db[name=postfix, port="80,443,25,587,465,110,995,143,993,4190", protocol=tcp]

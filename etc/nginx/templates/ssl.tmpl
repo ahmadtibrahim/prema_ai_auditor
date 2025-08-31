@@ -1,0 +1,26 @@
+ssl_protocols TLSv1.2 TLSv1.3;
+
+# Fix 'The Logjam Attack'.
+ssl_ciphers EECDH+CHACHA20:EECDH+AESGCM:EDH+AESGCM:AES256+EECDH;
+ssl_prefer_server_ciphers on;
+ssl_dhparam /etc/ssl/dh2048_param.pem;
+
+# Greatly improve the performance of keep-alive connections over SSL.
+# With this enabled, client is not necessary to do a full SSL-handshake for
+# every request, thus saving time and cpu-resources.
+ssl_session_cache shared:SSL:10m;
+
+# To use your own ssl cert (e.g. "Let's Encrypt"), please create symbol link to
+# ssl cert/key used below, so that we can manage this config file with Ansible.
+#
+# For example:
+#
+# rm -f /etc/ssl/private/iRedMail.key
+# rm -f /etc/ssl/certs/iRedMail.crt
+# ln -s /etc/letsencrypt/live/<domain>/privkey.pem /etc/ssl/private/iRedMail.key
+# ln -s /etc/letsencrypt/live/<domain>/fullchain.pem /etc/ssl/certs/iRedMail.crt
+#
+# To request free "Let's Encrypt" cert, please check our tutorial:
+# https://docs.iredmail.org/letsencrypt.html
+ssl_certificate /etc/ssl/certs/iRedMail.crt;
+ssl_certificate_key /etc/ssl/private/iRedMail.key;

@@ -1,0 +1,9 @@
+[roundcube]
+backend     = polling
+journalmatch=
+enabled     = true
+findtime    = 3600
+filter      = roundcube.iredmail
+logpath     = /var/log/mail.log
+action      = nftables-multiport[name=roundcube, port="80,443,25,587,465,110,995,143,993,4190", protocol=tcp]
+              banned_db[name=roundcube, port="80,443,25,587,465,110,995,143,993,4190", protocol=tcp]

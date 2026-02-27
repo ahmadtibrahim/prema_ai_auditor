@@ -16,7 +16,11 @@
                 </select>
             </div>
 
-            <div class="o_prema_chat_window">
+            <div class="alert alert-warning mt-2" t-if="state.errorMessage">
+                <t t-esc="state.errorMessage"/>
+            </div>
+
+            <div class="o_prema_chat_window" t-ref="chatWindow">
                 <t t-foreach="state.messages" t-as="msg" t-key="msg.content + msg.role + msg_index">
                     <div t-att-class="'msg ' + msg.role">
                         <t t-esc="msg.content"/>
@@ -25,8 +29,11 @@
             </div>
 
             <div class="o_prema_input">
-                <input t-model="state.input" placeholder="Ask AI Auditor..."/>
-                <button t-on-click="send">Send</button>
+                <input t-model="state.input" t-on-keydown="onInputKeydown" placeholder="Ask AI Auditor..."/>
+                <button t-on-click="send" t-att-disabled="state.isSending or !state.sessionId">
+                    <t t-if="state.isSending">Sending...</t>
+                    <t t-else="">Send</t>
+                </button>
             </div>
 
             <div class="o_prema_modal" t-if="state.showBatchModal">

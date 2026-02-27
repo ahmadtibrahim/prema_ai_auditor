@@ -22,3 +22,10 @@ from . import ai_error_monitor
 from . import ai_mail_monitor
 from . import ai_integrity_engine
 from . import ai_self_heal_engine
+from . import ai_realtime_feed
+from . import ai_performance_monitor
+from . import ai_memory
+from . import ai_config_audit
+from . import ai_dashboard_metrics
+from . import ai_predictive_model
+from . import ai_severity_classifier

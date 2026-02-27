@@ -7,11 +7,26 @@ import { useService } from "@web/core/utils/hooks";
 class PremaChat extends Component {
     setup() {
         this.rpc = useService("rpc");
+        this.bus = useService("bus_service");
         this.state = useState({
             messages: [],
             input: "",
             healthScore: 100,
         });
+
+        this.bus.addChannel("prema_ai_channel");
+        this.bus.addEventListener("notification", this.onNotification.bind(this));
+    }
+
+    onNotification({ detail }) {
+        for (const notification of detail || []) {
+            if (notification.type === "prema_ai_channel") {
+                this.state.messages.push({
+                    role: "system",
+                    content: `Realtime Alert: ${JSON.stringify(notification.payload)}`,
+                });
+            }
+        }
     }
 
     async send() {

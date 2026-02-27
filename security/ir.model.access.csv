@@ -8,3 +8,4 @@ access_prema_ai_action_request_master,access.prema.ai.action.request.master,mode
 access_prema_ai_audit_log_master,access.prema.ai.audit.log.master,model_prema_ai_audit_log,prema_ai_auditor.group_prema_ai_master,1,0,1,0
 access_prema_ai_session_master,access.prema.ai.session.master,model_prema_ai_session,prema_ai_auditor.group_prema_ai_master,1,1,1,1
 access_prema_ai_message_master,access.prema.ai.message.master,model_prema_ai_message,prema_ai_auditor.group_prema_ai_master,1,1,1,1
+access_prema_ai_memory_master,access.prema.ai.memory.master,model_prema_ai_memory,prema_ai_auditor.group_prema_ai_master,1,1,1,0

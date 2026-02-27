@@ -12,3 +12,12 @@ class AIErrorMonitor(models.AbstractModel):
             limit=limit,
         )
         return [{"type": "server_error", "message": log.message or ""} for log in logs]
+
+    def scan_errors(self):
+        return self.recent_errors()
+
+    def scan_and_push(self):
+        errors = self.scan_errors()
+        for error in errors:
+            self.env["prema.ai.realtime"].push_event("error", error)
+        return len(errors)

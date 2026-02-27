@@ -22,6 +22,9 @@ class PremaChat extends Component {
             isSending: false,
             errorMessage: "",
             batchSummary: { total: 0, clean: 0, duplicate: 0, missing_vendor: 0 },
+            incidents: [],
+            schemaModel: "account.move",
+            schemaFields: "",
         });
 
         this._initializeSession();
@@ -76,6 +79,7 @@ class PremaChat extends Component {
             });
 
             this.state.healthScore = response.health_score;
+            await this.loadIncidents();
         } catch {
             this.state.errorMessage = "Could not fetch AI response. Please retry.";
             this.state.messages.push({
@@ -115,6 +119,18 @@ class PremaChat extends Component {
 
     closeBatchModal() {
         this.state.showBatchModal = false;
+    }
+
+    async loadIncidents() {
+        this.state.incidents = await this.rpc("/prema_ai/incidents", { limit: 20 });
+    }
+
+    async loadSchemaModel() {
+        if (!this.state.schemaModel) {
+            return;
+        }
+        const response = await this.rpc("/prema_ai/schema_model", { model_name: this.state.schemaModel });
+        this.state.schemaFields = response.fields || "";
     }
 
     async createCleanOnlyDrafts() {

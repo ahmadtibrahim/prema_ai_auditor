@@ -29,10 +29,11 @@ from . import ai_config_audit
 from . import ai_dashboard_metrics
 from . import ai_predictive_model
 from . import ai_severity_classifier
-
 from . import ai_document
 from . import ai_document_processor
-
 from . import prema_ai_proposal
 from . import mapping_validator
+from . import prema_ai_incident
+from . import prema_ai_document
+from . import schema_browser
 from . import wizards

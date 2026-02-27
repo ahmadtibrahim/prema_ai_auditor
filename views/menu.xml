@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_prema_ai_root" name="Prema AI Auditor" groups="prema_ai_auditor.group_prema_ai_auditor"/>
+    <menuitem id="menu_prema_ai_logs" name="Audit Logs" parent="menu_prema_ai_root" action="action_prema_audit_log" groups="prema_ai_auditor.group_prema_ai_auditor"/>
+    <menuitem id="menu_prema_ai_dashboard" name="Dashboard" parent="menu_prema_ai_root" action="action_prema_ai_dashboard" groups="prema_ai_auditor.group_prema_ai_auditor"/>
+</odoo>

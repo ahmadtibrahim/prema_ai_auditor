@@ -7,6 +7,7 @@ export class AIChatUpload extends Component {
         this.state = useState({
             dragging: false,
             uploading: false,
+            progress: 0,
             files: [],
             done: 0,
             total: 0,
@@ -40,6 +41,10 @@ export class AIChatUpload extends Component {
         this.refs.fileInput.click();
     }
 
+    _isImage(mimetype) {
+        return (mimetype || "").startsWith("image/");
+    }
+
     async uploadFiles(fileList) {
         if (!fileList || !fileList.length || !this.props.sessionId) {
             return;
@@ -48,10 +53,11 @@ export class AIChatUpload extends Component {
         this.state.uploading = true;
         this.state.total = fileList.length;
         this.state.done = 0;
+        this.state.progress = 0;
         this.state.files = [];
 
         for (const file of fileList) {
-            this.state.files.push({ name: file.name, progress: 0, status: "uploading" });
+            this.state.files.push({ name: file.name, progress: 0, status: "uploading", attachment_id: false, mimetype: file.type });
             const index = this.state.files.length - 1;
 
             const formData = new FormData();
@@ -66,14 +72,21 @@ export class AIChatUpload extends Component {
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
                         this.state.files[index].progress = Math.round((event.loaded / event.total) * 100);
+                        const overall = ((this.state.done + (event.loaded / event.total)) / this.state.total) * 100;
+                        this.state.progress = Math.round(overall);
                     }
                 };
 
                 xhr.onload = () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
+                        const result = JSON.parse(xhr.responseText);
+                        this.state.files[index].attachment_id = result.attachment_id;
+                        this.state.files[index].mimetype = result.mimetype;
+                        this.state.files[index].name = result.name;
                         this.state.files[index].progress = 100;
                         this.state.files[index].status = "done";
                         this.state.done += 1;
+                        this.state.progress = Math.round((this.state.done / this.state.total) * 100);
                         resolve();
                         return;
                     }
@@ -90,6 +103,7 @@ export class AIChatUpload extends Component {
             });
         }
 
+        this.state.progress = 100;
         this.state.uploading = false;
         if (this.props.onUploaded) {
             this.props.onUploaded();

@@ -17,6 +17,8 @@ class PremaChat extends Component {
             healthScore: 100,
             sessionId: null,
             mode: "advice_only",
+            showBatchModal: false,
+            batchSummary: { total: 0, clean: 0, duplicate: 0, missing_vendor: 0 },
         });
 
         this._initializeSession();
@@ -76,6 +78,32 @@ class PremaChat extends Component {
                 content: response.summary,
             });
         }
+        if ((response?.batch_summary?.total || 0) > 1) {
+            this.state.batchSummary = response.batch_summary;
+            this.state.showBatchModal = true;
+        }
+    }
+
+    closeBatchModal() {
+        this.state.showBatchModal = false;
+    }
+
+    async createCleanOnlyDrafts() {
+        await this.rpc("/prema_ai/create_drafts", {
+            session_id: this.state.sessionId,
+            clean_only: true,
+        });
+        this.state.showBatchModal = false;
+        this.state.messages.push({ role: "system", content: "Created clean documents as draft bills." });
+    }
+
+    async createAllDrafts() {
+        await this.rpc("/prema_ai/create_drafts", {
+            session_id: this.state.sessionId,
+            clean_only: false,
+        });
+        this.state.showBatchModal = false;
+        this.state.messages.push({ role: "system", content: "Created all processed documents as draft bills." });
     }
 }
 

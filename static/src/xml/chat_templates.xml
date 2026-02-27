@@ -28,6 +28,23 @@
                 <input t-model="state.input" placeholder="Ask AI Auditor..."/>
                 <button t-on-click="send">Send</button>
             </div>
+
+            <div class="o_prema_modal" t-if="state.showBatchModal">
+                <div class="o_prema_modal_content">
+                    <h4>You are about to create <t t-esc="state.batchSummary.total"/> Draft Bills.</h4>
+                    <div>Summary:</div>
+                    <ul>
+                        <li><t t-esc="state.batchSummary.clean"/> clean</li>
+                        <li><t t-esc="state.batchSummary.duplicate"/> duplicate</li>
+                        <li><t t-esc="state.batchSummary.missing_vendor"/> missing vendor</li>
+                    </ul>
+                    <div class="o_prema_modal_actions">
+                        <button class="btn btn-primary" t-on-click="createCleanOnlyDrafts">Create Clean Only</button>
+                        <button class="btn btn-secondary" t-on-click="createAllDrafts">Create All As Draft</button>
+                        <button class="btn btn-link" t-on-click="closeBatchModal">Cancel</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </t>
 </templates>

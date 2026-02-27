@@ -18,6 +18,7 @@
         "views/menu.xml",
         "views/audit_log_views.xml",
         "views/audit_dashboard_views.xml",
+        "views/cleanup_views.xml",
         "data/default_rules.xml",
         "data/cron.xml",
     ],

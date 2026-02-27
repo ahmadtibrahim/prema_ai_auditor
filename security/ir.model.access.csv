@@ -2,3 +2,5 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_prema_audit_log_manager,access.prema.audit.log.manager,model_prema_audit_log,prema_ai_auditor.group_prema_ai_auditor,1,1,1,1
 access_prema_audit_rule_manager,access.prema.audit.rule.manager,model_prema_audit_rule,prema_ai_auditor.group_prema_ai_auditor,1,1,1,1
 access_prema_audit_session_manager,access.prema.audit.session.manager,model_prema_audit_session,prema_ai_auditor.group_prema_ai_auditor,1,1,1,1
+access_prema_cleanup_plan_manager,access.prema.cleanup.plan.manager,model_prema_cleanup_plan,prema_ai_auditor.group_prema_ai_auditor,1,1,1,1
+access_prema_cleanup_step_manager,access.prema.cleanup.step.manager,model_prema_cleanup_step,prema_ai_auditor.group_prema_ai_auditor,1,1,1,1

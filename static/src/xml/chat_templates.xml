@@ -7,6 +7,15 @@
                 <div>Health Score: <t t-esc="state.healthScore"/>%</div>
             </div>
 
+            <AIChatUpload sessionId="state.sessionId" onUploaded.bind="refreshDocumentSummary"/>
+
+            <div class="o_prema_input mt-2">
+                <select t-model="state.mode" class="form-select form-select-sm">
+                    <option value="advice_only">Advice only</option>
+                    <option value="draft">Create draft after approval</option>
+                </select>
+            </div>
+
             <div class="o_prema_chat_window">
                 <t t-foreach="state.messages" t-as="msg" t-key="msg.content + msg.role + msg_index">
                     <div t-att-class="'msg ' + msg.role">

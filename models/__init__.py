@@ -13,3 +13,12 @@ from . import cleanup_plan
 from . import cleanup_step
 from . import integrity_scanner
 from . import risk_matrix
+from . import ai_session
+from . import ai_message
+from . import ai_action_request
+from . import ai_audit_log
+from . import ai_write_gate
+from . import ai_error_monitor
+from . import ai_mail_monitor
+from . import ai_integrity_engine
+from . import ai_self_heal_engine

@@ -4,3 +4,7 @@ access_prema_audit_rule_manager,access.prema.audit.rule.manager,model_prema_audi
 access_prema_audit_session_manager,access.prema.audit.session.manager,model_prema_audit_session,prema_ai_auditor.group_prema_ai_auditor,1,1,1,1
 access_prema_cleanup_plan_manager,access.prema.cleanup.plan.manager,model_prema_cleanup_plan,prema_ai_auditor.group_prema_ai_auditor,1,1,1,1
 access_prema_cleanup_step_manager,access.prema.cleanup.step.manager,model_prema_cleanup_step,prema_ai_auditor.group_prema_ai_auditor,1,1,1,1
+access_prema_ai_action_request_master,access.prema.ai.action.request.master,model_prema_ai_action_request,prema_ai_auditor.group_prema_ai_master,1,1,1,0
+access_prema_ai_audit_log_master,access.prema.ai.audit.log.master,model_prema_ai_audit_log,prema_ai_auditor.group_prema_ai_master,1,0,1,0
+access_prema_ai_session_master,access.prema.ai.session.master,model_prema_ai_session,prema_ai_auditor.group_prema_ai_master,1,1,1,1
+access_prema_ai_message_master,access.prema.ai.message.master,model_prema_ai_message,prema_ai_auditor.group_prema_ai_master,1,1,1,1

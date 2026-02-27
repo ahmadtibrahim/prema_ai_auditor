@@ -15,6 +15,7 @@
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
+        "views/chat_action.xml",
         "views/menu.xml",
         "views/audit_log_views.xml",
         "views/audit_dashboard_views.xml",

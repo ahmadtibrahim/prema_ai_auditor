@@ -1,0 +1,14 @@
+from odoo import models
+
+
+class AIErrorMonitor(models.AbstractModel):
+    _name = "prema.ai.error.monitor"
+    _description = "Prema AI Error Monitor"
+
+    def recent_errors(self, limit=20):
+        logs = self.env["ir.logging"].search(
+            [("level", "in", ["ERROR", "CRITICAL"])],
+            order="create_date desc",
+            limit=limit,
+        )
+        return [{"type": "server_error", "message": log.message or ""} for log in logs]

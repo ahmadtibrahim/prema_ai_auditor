@@ -1,0 +1,28 @@
+.ai-drop-zone {
+    border: 2px dashed #4a90e2;
+    padding: 20px;
+    border-radius: 8px;
+    position: relative;
+}
+
+.ai-drag-overlay {
+    position: absolute;
+    background: rgba(74, 144, 226, 0.2);
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.ai-file-input {
+    display: none;
+}
+
+.ai-upload-list {
+    margin-top: 10px;
+    padding-left: 20px;
+}

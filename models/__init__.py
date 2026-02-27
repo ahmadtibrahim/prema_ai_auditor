@@ -32,3 +32,7 @@ from . import ai_severity_classifier
 
 from . import ai_document
 from . import ai_document_processor
+
+from . import prema_ai_proposal
+from . import mapping_validator
+from . import wizards

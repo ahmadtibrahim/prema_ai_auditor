@@ -1,0 +1,55 @@
+[options]
+
+;-------------------------
+; Database
+;-------------------------
+db_host = False
+db_port = False
+db_user = odoo18
+db_password = @Hmad_1982:PF
+db_name = Prod-db
+admin_passwd = @Hmad_1982#PremaFirm
+
+;-------------------------
+; Paths
+;-------------------------
+addons_path = /opt/odoo/odoo18/addons,/opt/odoo/enterprise-18.0,/opt/odoo/custom-addons
+logfile = /var/log/odoo/odoo18.log
+
+;-------------------------
+; Performance / Stability
+;-------------------------
+workers = 4
+max_cron_threads = 1
+
+limit_memory_soft = 1200000000
+limit_memory_hard = 1500000000
+
+limit_time_cpu = 600
+limit_time_real = 1200
+limit_time_real_cron = 600
+limit_request = 8192
+
+;-------------------------
+; Network
+;-------------------------
+xmlrpc_port = 8069
+longpolling_port = 8072
+gevent_port = 8072
+proxy_mode = True
+database.secret = a4f939424ff3b2336bf3465893b22568c49d56e76a1136c69b9ca084ece0bd1a6aa4a1dbdb457cf8af7bf8d243352c97a627de67389e793ca5fffa1d906d19ab
+
+;-------------------------
+; Web / Proxy
+;-------------------------
+web.base.url = https://erp.premafirm.com
+websocket_keep_alive_timeout = 600
+;-------------------------
+; Content Security Policy
+;-------------------------
+content_security_policy = default-src 'self' https: data: blob:; connect-src 'self' https: wss://*.voip.ms; media-src 'self' https: blob:;
+
+;-------------------------
+; Logging
+;-------------------------
+log_level = debug

@@ -1,0 +1,8 @@
+odoo18    389907  0.0  1.2 241304 204940 ?       Ss   Feb26   0:05 /opt/odoo/venv-18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo18.conf
+odoo18    389915  0.0  1.5 349892 253156 ?       Sl   Feb26   0:19 /opt/odoo/venv-18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo18.conf
+odoo18    389916  0.0  1.4 350916 244424 ?       Sl   Feb26   0:19 /opt/odoo/venv-18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo18.conf
+odoo18    389919  0.0  1.5 350916 251944 ?       Sl   Feb26   0:18 /opt/odoo/venv-18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo18.conf
+odoo18    389922  0.0  1.4 349892 242568 ?       Sl   Feb26   0:18 /opt/odoo/venv-18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo18.conf
+odoo18    389923  0.0  1.3 325876 216540 ?       S    Feb26   0:08 /opt/odoo/venv-18/bin/python3 /opt/odoo/odoo18/odoo-bin gevent -c /etc/odoo18.conf
+odoo18    389925  0.0  1.2 320196 198844 ?       SNl  Feb26   0:09 /opt/odoo/venv-18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo18.conf
+root      425727  0.0  0.0   7080  2292 pts/2    S+   04:40   0:00 grep --color=auto odoo-bin

@@ -1,0 +1,205 @@
+                                                    Table "public.account_move"
+              Column               |            Type             | Collation | Nullable |                 Default                  
+-----------------------------------+-----------------------------+-----------+----------+------------------------------------------
+ id                                | integer                     |           | not null | nextval('account_move_id_seq'::regclass)
+ sequence_number                   | integer                     |           |          | 
+ message_main_attachment_id        | integer                     |           |          | 
+ journal_id                        | integer                     |           | not null | 
+ company_id                        | integer                     |           |          | 
+ origin_payment_id                 | integer                     |           |          | 
+ statement_line_id                 | integer                     |           |          | 
+ tax_cash_basis_rec_id             | integer                     |           |          | 
+ tax_cash_basis_origin_move_id     | integer                     |           |          | 
+ auto_post_origin_id               | integer                     |           |          | 
+ secure_sequence_number            | integer                     |           |          | 
+ invoice_payment_term_id           | integer                     |           |          | 
+ partner_id                        | integer                     |           |          | 
+ commercial_partner_id             | integer                     |           |          | 
+ partner_shipping_id               | integer                     |           |          | 
+ partner_bank_id                   | integer                     |           |          | 
+ fiscal_position_id                | integer                     |           |          | 
+ preferred_payment_method_line_id  | integer                     |           |          | 
+ currency_id                       | integer                     |           | not null | 
+ reversed_entry_id                 | integer                     |           |          | 
+ invoice_user_id                   | integer                     |           |          | 
+ invoice_incoterm_id               | integer                     |           |          | 
+ invoice_cash_rounding_id          | integer                     |           |          | 
+ create_uid                        | integer                     |           |          | 
+ write_uid                         | integer                     |           |          | 
+ sequence_prefix                   | character varying           |           |          | 
+ access_token                      | character varying           |           |          | 
+ name                              | character varying           |           |          | 
+ ref                               | character varying           |           |          | 
+ state                             | character varying           |           | not null | 
+ move_type                         | character varying           |           | not null | 
+ auto_post                         | character varying           |           | not null | 
+ inalterable_hash                  | character varying           |           |          | 
+ payment_reference                 | character varying           |           |          | 
+ qr_code_method                    | character varying           |           |          | 
+ payment_state                     | character varying           |           |          | 
+ invoice_source_email              | character varying           |           |          | 
+ invoice_partner_display_name      | character varying           |           |          | 
+ invoice_origin                    | character varying           |           |          | 
+ incoterm_location                 | character varying           |           |          | 
+ date                              | date                        |           | not null | 
+ auto_post_until                   | date                        |           |          | 
+ invoice_date                      | date                        |           |          | 
+ invoice_date_due                  | date                        |           |          | 
+ delivery_date                     | date                        |           |          | 
+ sending_data                      | jsonb                       |           |          | 
+ narration                         | text                        |           |          | 
+ invoice_currency_rate             | numeric                     |           |          | 
+ amount_untaxed                    | numeric                     |           |          | 
+ amount_tax                        | numeric                     |           |          | 
+ amount_total                      | numeric                     |           |          | 
+ amount_residual                   | numeric                     |           |          | 
+ amount_untaxed_signed             | numeric                     |           |          | 
+ amount_untaxed_in_currency_signed | numeric                     |           |          | 
+ amount_tax_signed                 | numeric                     |           |          | 
+ amount_total_signed               | numeric                     |           |          | 
+ amount_total_in_currency_signed   | numeric                     |           |          | 
+ amount_residual_signed            | numeric                     |           |          | 
+ quick_edit_total_amount           | numeric                     |           |          | 
+ is_storno                         | boolean                     |           |          | 
+ always_tax_exigible               | boolean                     |           |          | 
+ checked                           | boolean                     |           |          | 
+ posted_before                     | boolean                     |           |          | 
+ made_sequence_gap                 | boolean                     |           |          | 
+ is_manually_modified              | boolean                     |           |          | 
+ is_move_sent                      | boolean                     |           |          | 
+ create_date                       | timestamp without time zone |           |          | 
+ write_date                        | timestamp without time zone |           |          | 
+ signing_user                      | integer                     |           |          | 
+ payment_state_before_switch       | character varying           |           |          | 
+ transfer_model_id                 | integer                     |           |          | 
+ avatax_tax_date                   | date                        |           |          | 
+ extract_attachment_id             | integer                     |           |          | 
+ extract_detected_layout           | integer                     |           |          | 
+ extract_state                     | character varying           |           |          | 
+ extract_status                    | character varying           |           |          | 
+ extract_document_uuid             | character varying           |           |          | 
+ extract_partner_name              | character varying           |           |          | 
+ extract_prefill_data              | jsonb                       |           |          | 
+ is_in_extractable_state           | boolean                     |           |          | 
+ extract_state_processed           | boolean                     |           |          | 
+ tax_closing_report_id             | integer                     |           |          | 
+ asset_id                          | integer                     |           |          | 
+ asset_number_days                 | integer                     |           |          | 
+ asset_move_type                   | character varying           |           |          | 
+ asset_depreciation_beginning_date | date                        |           |          | 
+ depreciation_value                | numeric                     |           |          | 
+ asset_value_change                | boolean                     |           |          | 
+ generating_loan_line_id           | integer                     |           |          | 
+ is_loan_payment_move              | boolean                     |           |          | 
+ campaign_id                       | integer                     |           |          | 
+ source_id                         | integer                     |           |          | 
+ medium_id                         | integer                     |           |          | 
+ team_id                           | integer                     |           |          | 
+ suspense_statement_line_id        | integer                     |           |          | 
+ expense_sheet_id                  | integer                     |           |          | 
+ stock_move_id                     | integer                     |           |          | 
+ premafirm_po                      | character varying           |           |          | 
+ premafirm_bol                     | character varying           |           |          | 
+ premafirm_pod                     | character varying           |           |          | 
+ load_reference                    | character varying           |           |          | 
+Indexes:
+    "account_move_pkey" PRIMARY KEY, btree (id)
+    "account_move__asset_id_index" btree (asset_id)
+    "account_move__auto_post_origin_id_index" btree (auto_post_origin_id) WHERE auto_post_origin_id IS NOT NULL
+    "account_move__campaign_id_index" btree (campaign_id) WHERE campaign_id IS NOT NULL
+    "account_move__company_id_index" btree (company_id)
+    "account_move__date_index" btree (date)
+    "account_move__expense_sheet_id_index" btree (expense_sheet_id) WHERE expense_sheet_id IS NOT NULL
+    "account_move__extract_attachment_id_index" btree (extract_attachment_id) WHERE extract_attachment_id IS NOT NULL
+    "account_move__generating_loan_line_id_index" btree (generating_loan_line_id)
+    "account_move__inalterable_hash_index" btree (inalterable_hash) WHERE inalterable_hash IS NOT NULL
+    "account_move__invoice_date_due_index" btree (invoice_date_due)
+    "account_move__invoice_date_index" btree (invoice_date)
+    "account_move__medium_id_index" btree (medium_id) WHERE medium_id IS NOT NULL
+    "account_move__message_main_attachment_id_index" btree (message_main_attachment_id) WHERE message_main_attachment_id IS NOT NULL
+    "account_move__move_type_index" btree (move_type)
+    "account_move__name_index" gin (name gin_trgm_ops)
+    "account_move__origin_payment_id_index" btree (origin_payment_id) WHERE origin_payment_id IS NOT NULL
+    "account_move__partner_id_index" btree (partner_id)
+    "account_move__payment_reference_index" gin (payment_reference gin_trgm_ops)
+    "account_move__ref_index" gin (ref gin_trgm_ops)
+    "account_move__reversed_entry_id_index" btree (reversed_entry_id) WHERE reversed_entry_id IS NOT NULL
+    "account_move__secure_sequence_number_index" btree (secure_sequence_number)
+    "account_move__source_id_index" btree (source_id) WHERE source_id IS NOT NULL
+    "account_move__statement_line_id_index" btree (statement_line_id) WHERE statement_line_id IS NOT NULL
+    "account_move__stock_move_id_index" btree (stock_move_id) WHERE stock_move_id IS NOT NULL
+    "account_move__suspense_statement_line_id_index" btree (suspense_statement_line_id) WHERE suspense_statement_line_id IS NOT NULL
+    "account_move__tax_cash_basis_origin_move_id_index" btree (tax_cash_basis_origin_move_id) WHERE tax_cash_basis_origin_move_id IS NOT NULL
+    "account_move__tax_cash_basis_rec_id_index" btree (tax_cash_basis_rec_id) WHERE tax_cash_basis_rec_id IS NOT NULL
+    "account_move_checked_idx" btree (journal_id) WHERE checked = false
+    "account_move_duplicate_bills_idx" btree (ref) WHERE move_type::text = ANY (ARRAY['in_invoice'::character varying, 'in_refund'::character varying]::text[])
+    "account_move_journal_id_company_id_idx" btree (journal_id, company_id, date)
+    "account_move_made_gaps" btree (journal_id, company_id, date) WHERE made_sequence_gap = true
+    "account_move_payment_idx" btree (journal_id, state, payment_state, move_type, date)
+    "account_move_sequence_index" btree (journal_id, sequence_prefix DESC, sequence_number DESC, name)
+    "account_move_sequence_index2" btree (journal_id, id DESC, sequence_prefix)
+    "account_move_unique_name" UNIQUE, btree (name, journal_id) WHERE state::text = 'posted'::text AND name::text <> '/'::text
+Foreign-key constraints:
+    "account_move_asset_id_fkey" FOREIGN KEY (asset_id) REFERENCES account_asset(id) ON DELETE CASCADE
+    "account_move_auto_post_origin_id_fkey" FOREIGN KEY (auto_post_origin_id) REFERENCES account_move(id) ON DELETE SET NULL
+    "account_move_campaign_id_fkey" FOREIGN KEY (campaign_id) REFERENCES utm_campaign(id) ON DELETE SET NULL
+    "account_move_commercial_partner_id_fkey" FOREIGN KEY (commercial_partner_id) REFERENCES res_partner(id) ON DELETE RESTRICT
+    "account_move_company_id_fkey" FOREIGN KEY (company_id) REFERENCES res_company(id) ON DELETE SET NULL
+    "account_move_create_uid_fkey" FOREIGN KEY (create_uid) REFERENCES res_users(id) ON DELETE SET NULL
+    "account_move_currency_id_fkey" FOREIGN KEY (currency_id) REFERENCES res_currency(id) ON DELETE RESTRICT
+    "account_move_expense_sheet_id_fkey" FOREIGN KEY (expense_sheet_id) REFERENCES hr_expense_sheet(id) ON DELETE SET NULL
+    "account_move_extract_attachment_id_fkey" FOREIGN KEY (extract_attachment_id) REFERENCES ir_attachment(id) ON DELETE SET NULL
+    "account_move_fiscal_position_id_fkey" FOREIGN KEY (fiscal_position_id) REFERENCES account_fiscal_position(id) ON DELETE RESTRICT
+    "account_move_generating_loan_line_id_fkey" FOREIGN KEY (generating_loan_line_id) REFERENCES account_loan_line(id) ON DELETE CASCADE
+    "account_move_invoice_cash_rounding_id_fkey" FOREIGN KEY (invoice_cash_rounding_id) REFERENCES account_cash_rounding(id) ON DELETE SET NULL
+    "account_move_invoice_incoterm_id_fkey" FOREIGN KEY (invoice_incoterm_id) REFERENCES account_incoterms(id) ON DELETE SET NULL
+    "account_move_invoice_payment_term_id_fkey" FOREIGN KEY (invoice_payment_term_id) REFERENCES account_payment_term(id) ON DELETE SET NULL
+    "account_move_invoice_user_id_fkey" FOREIGN KEY (invoice_user_id) REFERENCES res_users(id) ON DELETE SET NULL
+    "account_move_journal_id_fkey" FOREIGN KEY (journal_id) REFERENCES account_journal(id) ON DELETE RESTRICT
+    "account_move_medium_id_fkey" FOREIGN KEY (medium_id) REFERENCES utm_medium(id) ON DELETE SET NULL
+    "account_move_message_main_attachment_id_fkey" FOREIGN KEY (message_main_attachment_id) REFERENCES ir_attachment(id) ON DELETE SET NULL
+    "account_move_origin_payment_id_fkey" FOREIGN KEY (origin_payment_id) REFERENCES account_payment(id) ON DELETE SET NULL
+    "account_move_partner_bank_id_fkey" FOREIGN KEY (partner_bank_id) REFERENCES res_partner_bank(id) ON DELETE RESTRICT
+    "account_move_partner_id_fkey" FOREIGN KEY (partner_id) REFERENCES res_partner(id) ON DELETE RESTRICT
+    "account_move_partner_shipping_id_fkey" FOREIGN KEY (partner_shipping_id) REFERENCES res_partner(id) ON DELETE SET NULL
+    "account_move_preferred_payment_method_line_id_fkey" FOREIGN KEY (preferred_payment_method_line_id) REFERENCES account_payment_method_line(id) ON DELETE SET NULL
+    "account_move_reversed_entry_id_fkey" FOREIGN KEY (reversed_entry_id) REFERENCES account_move(id) ON DELETE SET NULL
+    "account_move_signing_user_fkey" FOREIGN KEY (signing_user) REFERENCES res_users(id) ON DELETE SET NULL
+    "account_move_source_id_fkey" FOREIGN KEY (source_id) REFERENCES utm_source(id) ON DELETE SET NULL
+    "account_move_statement_line_id_fkey" FOREIGN KEY (statement_line_id) REFERENCES account_bank_statement_line(id) ON DELETE SET NULL
+    "account_move_stock_move_id_fkey" FOREIGN KEY (stock_move_id) REFERENCES stock_move(id) ON DELETE SET NULL
+    "account_move_suspense_statement_line_id_fkey" FOREIGN KEY (suspense_statement_line_id) REFERENCES account_bank_statement_line(id) ON DELETE SET NULL
+    "account_move_tax_cash_basis_origin_move_id_fkey" FOREIGN KEY (tax_cash_basis_origin_move_id) REFERENCES account_move(id) ON DELETE SET NULL
+    "account_move_tax_cash_basis_rec_id_fkey" FOREIGN KEY (tax_cash_basis_rec_id) REFERENCES account_partial_reconcile(id) ON DELETE SET NULL
+    "account_move_tax_closing_report_id_fkey" FOREIGN KEY (tax_closing_report_id) REFERENCES account_report(id) ON DELETE SET NULL
+    "account_move_team_id_fkey" FOREIGN KEY (team_id) REFERENCES crm_team(id) ON DELETE SET NULL
+    "account_move_transfer_model_id_fkey" FOREIGN KEY (transfer_model_id) REFERENCES account_transfer_model(id) ON DELETE SET NULL
+    "account_move_write_uid_fkey" FOREIGN KEY (write_uid) REFERENCES res_users(id) ON DELETE SET NULL
+Referenced by:
+    TABLE "account_analytic_line" CONSTRAINT "account_analytic_line_timesheet_invoice_id_fkey" FOREIGN KEY (timesheet_invoice_id) REFERENCES account_move(id) ON DELETE SET NULL
+    TABLE "account_bank_statement_line" CONSTRAINT "account_bank_statement_line_move_id_fkey" FOREIGN KEY (move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_full_reconcile" CONSTRAINT "account_full_reconcile_exchange_move_id_fkey" FOREIGN KEY (exchange_move_id) REFERENCES account_move(id) ON DELETE SET NULL
+    TABLE "account_import_summary_account_move_rel" CONSTRAINT "account_import_summary_account_move_rel_account_move_id_fkey" FOREIGN KEY (account_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_invoice_extract_words" CONSTRAINT "account_invoice_extract_words_invoice_id_fkey" FOREIGN KEY (invoice_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_invoice_transaction_rel" CONSTRAINT "account_invoice_transaction_rel_invoice_id_fkey" FOREIGN KEY (invoice_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move__account_payment" CONSTRAINT "account_move__account_payment_invoice_id_fkey" FOREIGN KEY (invoice_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_account_move_send_batch_wizard_rel" CONSTRAINT "account_move_account_move_send_batch_wizar_account_move_id_fkey" FOREIGN KEY (account_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_account_resequence_wizard_rel" CONSTRAINT "account_move_account_resequence_wizard_rel_account_move_id_fkey" FOREIGN KEY (account_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_asset_modify_rel" CONSTRAINT "account_move_asset_modify_rel_account_move_id_fkey" FOREIGN KEY (account_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move" CONSTRAINT "account_move_auto_post_origin_id_fkey" FOREIGN KEY (auto_post_origin_id) REFERENCES account_move(id) ON DELETE SET NULL
+    TABLE "account_move_deferred_rel" CONSTRAINT "account_move_deferred_rel_deferred_move_id_fkey" FOREIGN KEY (deferred_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_deferred_rel" CONSTRAINT "account_move_deferred_rel_original_move_id_fkey" FOREIGN KEY (original_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_line" CONSTRAINT "account_move_line_move_id_fkey" FOREIGN KEY (move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_mrp_production_rel" CONSTRAINT "account_move_mrp_production_rel_account_move_id_fkey" FOREIGN KEY (account_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_purchase_order_rel" CONSTRAINT "account_move_purchase_order_rel_account_move_id_fkey" FOREIGN KEY (account_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_reversal_move" CONSTRAINT "account_move_reversal_move_move_id_fkey" FOREIGN KEY (move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move_reversal_new_move" CONSTRAINT "account_move_reversal_new_move_new_move_id_fkey" FOREIGN KEY (new_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move" CONSTRAINT "account_move_reversed_entry_id_fkey" FOREIGN KEY (reversed_entry_id) REFERENCES account_move(id) ON DELETE SET NULL
+    TABLE "account_move_send_wizard" CONSTRAINT "account_move_send_wizard_move_id_fkey" FOREIGN KEY (move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_move" CONSTRAINT "account_move_tax_cash_basis_origin_move_id_fkey" FOREIGN KEY (tax_cash_basis_origin_move_id) REFERENCES account_move(id) ON DELETE SET NULL
+    TABLE "account_move_validate_account_move_rel" CONSTRAINT "account_move_validate_account_move_rel_account_move_id_fkey" FOREIGN KEY (account_move_id) REFERENCES account_move(id) ON DELETE CASCADE
+    TABLE "account_partial_reconcile" CONSTRAINT "account_partial_reconcile_exchange_move_id_fkey" FOREIGN KEY (exchange_move_id) REFERENCES account_move(id) ON DELETE SET NULL
+    TABLE "account_payment" CONSTRAINT "account_payment_move_id_fkey" FOREIGN KEY (move_id) REFERENCES account_move(id) ON DELETE SET NULL
+    TABLE "res_company" CONSTRAINT "res_company_account_opening_move_id_fkey" FOREIGN KEY (account_opening_move_id) REFERENCES account_move(id) ON DELETE SET NULL
+    TABLE "stock_valuation_layer" CONSTRAINT "stock_valuation_layer_account_move_id_fkey" FOREIGN KEY (account_move_id) REFERENCES account_move(id) ON DELETE SET NULL
+

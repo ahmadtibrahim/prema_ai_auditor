@@ -59,6 +59,4 @@
         <field name="res_model">prema.cleanup.plan</field>
         <field name="view_mode">tree,form</field>
     </record>
-
-    <menuitem id="menu_prema_cleanup_plans" name="Cleanup Plans" parent="menu_prema_ai_root" action="action_prema_cleanup_plan" groups="prema_ai_auditor.group_prema_ai_auditor"/>
 </odoo>

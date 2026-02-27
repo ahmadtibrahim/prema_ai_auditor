@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="action_prema_ai_chat" model="ir.actions.client">
-        <field name="name">Prema AI Chat</field>
-        <field name="tag">prema_ai_chat</field>
-    </record>
-
-    <menuitem id="menu_prema_ai_root" name="Prema AI Auditor" groups="prema_ai_auditor.group_prema_ai_auditor"/>
-    <menuitem id="menu_prema_ai_chat" name="AI Chat" parent="menu_prema_ai_root" action="action_prema_ai_chat" groups="prema_ai_auditor.group_prema_ai_auditor"/>
-    <menuitem id="menu_prema_ai_logs" name="Audit Logs" parent="menu_prema_ai_root" action="action_prema_audit_log" groups="prema_ai_auditor.group_prema_ai_auditor"/>
-    <menuitem id="menu_prema_ai_dashboard" name="Dashboard" parent="menu_prema_ai_root" action="action_prema_ai_dashboard" groups="prema_ai_auditor.group_prema_ai_auditor"/>
+    <menuitem id="menu_prema_ai_root" name="Prema AI Auditor" groups="prema_ai_auditor.group_prema_ai_master"/>
+    <menuitem id="menu_prema_ai_chat" name="AI Chat" parent="menu_prema_ai_root" action="action_prema_ai_chat" groups="prema_ai_auditor.group_prema_ai_master"/>
+    <menuitem id="menu_prema_ai_logs" name="Audit Logs" parent="menu_prema_ai_root" action="action_prema_audit_log" groups="prema_ai_auditor.group_prema_ai_master"/>
+    <menuitem id="menu_prema_ai_dashboard" name="Dashboard" parent="menu_prema_ai_root" action="action_prema_ai_dashboard" groups="prema_ai_auditor.group_prema_ai_master"/>
+    <menuitem id="menu_prema_cleanup_plans" name="Cleanup Plans" parent="menu_prema_ai_root" action="action_prema_cleanup_plan" groups="prema_ai_auditor.group_prema_ai_master"/>
 </odoo>

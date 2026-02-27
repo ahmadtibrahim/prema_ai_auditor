@@ -10,7 +10,7 @@ class OpenAIClient(models.AbstractModel):
     _name = "prema.openai.client"
     _description = "OpenAI Client"
 
-    def call(self, messages):
+    def call(self, payload):
         api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
         if not api_key:
             raise UserError("OpenAI API key is not configured.")
@@ -20,11 +20,12 @@ class OpenAIClient(models.AbstractModel):
             "Content-Type": "application/json",
         }
 
-        payload = {
-            "model": "gpt-4.1",
-            "messages": messages,
-            "temperature": 0.2,
-        }
+        if isinstance(payload, list):
+            payload = {
+                "model": "gpt-4.1",
+                "messages": payload,
+                "temperature": 0.2,
+            }
 
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",

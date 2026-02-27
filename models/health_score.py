@@ -10,13 +10,12 @@ class HealthScore(models.AbstractModel):
 
         score = 100
         for log in logs:
-            if log.severity == "critical":
-                score -= 10
-            elif log.severity == "high":
-                score -= 5
-            elif log.severity == "medium":
-                score -= 2
-            else:
-                score -= 1
+            weight = {
+                "critical": 10,
+                "high": 5,
+                "medium": 3,
+                "low": 1,
+            }.get(log.severity, 1)
+            score -= weight
 
         return max(score, 0)

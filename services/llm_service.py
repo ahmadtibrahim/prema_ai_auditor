@@ -13,8 +13,9 @@ class PremaLLMService(models.AbstractModel):
 
         tools = self.env["prema.service.tool.registry"].get_tool_definitions()
 
+        config = self.env["prema.config.service"]
         payload = {
-            "model": "gpt-4.1",
+            "model": config.get("prema_ai_auditor.openai_model", env_key="OPENAI_MODEL", default="gpt-4.1"),
             "messages": [
                 {"role": "system", "content": "You are a controlled enterprise Odoo auditor."},
                 {"role": "user", "content": message},

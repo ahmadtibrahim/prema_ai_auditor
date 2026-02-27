@@ -11,9 +11,8 @@ class OpenAIClient(models.AbstractModel):
     _description = "OpenAI Client"
 
     def call(self, payload, timeout=45, retries=2):
-        api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
-        if not api_key:
-            raise UserError("OpenAI API key is not configured.")
+        config = self.env["prema.config.service"]
+        api_key = config.require("openai.api_key", env_key="OPENAI_API_KEY", label="OpenAI API key")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -29,7 +28,7 @@ class OpenAIClient(models.AbstractModel):
         for _idx in range(retries + 1):
             try:
                 response = requests.post(
-                    "https://api.openai.com/v1/chat/completions",
+                    config.get("prema_ai_auditor.openai_endpoint", env_key="OPENAI_ENDPOINT", default="https://api.openai.com/v1/chat/completions"),
                     headers=headers,
                     data=json.dumps(payload),
                     timeout=timeout,
@@ -41,4 +40,4 @@ class OpenAIClient(models.AbstractModel):
                 last_error = exc
 
         self.env["ir.config_parameter"].sudo().set_param(failure_count_param, str(failures + 1))
-        raise UserError(f"OpenAI request failed: {last_error}")
+        raise UserError("OpenAI request failed. Please verify remote connectivity and credentials.")

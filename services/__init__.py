@@ -8,3 +8,4 @@ from . import performance_guard
 from . import realtime_notifier
 from . import performance_sampler
 from . import predictive_engine
+from . import config

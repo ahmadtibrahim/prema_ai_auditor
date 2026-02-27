@@ -7,13 +7,16 @@ class AIConfigAudit(models.AbstractModel):
 
     def run(self):
         issues = []
-        params = self.env["ir.config_parameter"].sudo()
+        config = self.env["prema.config.service"]
 
-        if not params.get_param("web.base.url"):
+        if not config.get("web.base.url", env_key="WEB_BASE_URL"):
             issues.append("Missing base URL")
 
-        if not params.get_param("mail.catchall.domain"):
+        if not config.get("mail.catchall.domain", env_key="MAIL_CATCHALL_DOMAIN"):
             issues.append("Mail catchall not configured")
+
+        if not config.get("openai.api_key", env_key="OPENAI_API_KEY"):
+            issues.append("OpenAI API key missing")
 
         inactive_crons = self.env["ir.cron"].search([("active", "=", False)], limit=1)
         if inactive_crons:

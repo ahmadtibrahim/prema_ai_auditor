@@ -11,3 +11,5 @@ access_prema_ai_message_master,access.prema.ai.message.master,model_prema_ai_mes
 access_prema_ai_memory_master,access.prema.ai.memory.master,model_prema_ai_memory,prema_ai_auditor.group_prema_ai_master,1,1,1,0
 access_prema_ai_document_master,access.prema.ai.document.master,model_prema_ai_document,prema_ai_auditor.group_prema_ai_master,1,1,1,1
 access_prema_ai_document_processor_cron_master,access.prema.ai.document.processor.cron.master,model_prema_ai_document_processor_cron,prema_ai_auditor.group_prema_ai_master,1,0,0,0
+access_prema_ai_proposal_master,access.prema.ai.proposal.master,model_prema_ai_proposal,prema_ai_auditor.group_prema_ai_master,1,1,1,1
+

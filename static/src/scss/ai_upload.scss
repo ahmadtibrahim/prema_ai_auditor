@@ -63,3 +63,37 @@
     display: flex;
     gap: 8px;
 }
+
+.o_prema_chat_window {
+    max-height: 420px;
+    overflow-y: auto;
+    margin-top: 12px;
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.o_prema_chat_window .msg {
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+}
+
+.o_prema_chat_window .msg.user {
+    text-align: right;
+}
+
+.o_prema_chat_window .msg.assistant,
+.o_prema_chat_window .msg.system {
+    text-align: left;
+}
+
+.o_prema_input {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.o_prema_input input {
+    flex: 1;
+}

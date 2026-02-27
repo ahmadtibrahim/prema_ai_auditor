@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState } from "@odoo/owl";
+import { Component, useState, useRef, onPatched } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { AIChatUpload } from "../components/ai_chat_upload/ai_chat_upload";
@@ -11,6 +11,7 @@ class PremaChat extends Component {
     setup() {
         this.rpc = useService("rpc");
         this.bus = useService("bus_service");
+        this.chatWindowRef = useRef("chatWindow");
         this.state = useState({
             messages: [],
             input: "",
@@ -18,12 +19,21 @@ class PremaChat extends Component {
             sessionId: null,
             mode: "advice_only",
             showBatchModal: false,
+            isSending: false,
+            errorMessage: "",
             batchSummary: { total: 0, clean: 0, duplicate: 0, missing_vendor: 0 },
         });
 
         this._initializeSession();
         this.bus.addChannel("prema_ai_channel");
         this.bus.addEventListener("notification", this.onNotification.bind(this));
+
+        onPatched(() => {
+            const el = this.chatWindowRef.el;
+            if (el) {
+                el.scrollTop = el.scrollHeight;
+            }
+        });
     }
 
     async _initializeSession() {
@@ -43,26 +53,45 @@ class PremaChat extends Component {
     }
 
     async send() {
-        if (!this.state.input || !this.state.sessionId) {
+        if (!this.state.input || !this.state.sessionId || this.state.isSending) {
             return;
         }
 
         const userMsg = this.state.input;
         this.state.messages.push({ role: "user", content: userMsg });
         this.state.input = "";
+        this.state.isSending = true;
+        this.state.errorMessage = "";
 
-        const response = await this.rpc("/prema_ai/chat", {
-            message: userMsg,
-            session_id: this.state.sessionId,
-            mode: this.state.mode,
-        });
+        try {
+            const response = await this.rpc("/prema_ai/chat", {
+                message: userMsg,
+                session_id: this.state.sessionId,
+                mode: this.state.mode,
+            });
 
-        this.state.messages.push({
-            role: "assistant",
-            content: response.reply,
-        });
+            this.state.messages.push({
+                role: "assistant",
+                content: response.reply,
+            });
 
-        this.state.healthScore = response.health_score;
+            this.state.healthScore = response.health_score;
+        } catch {
+            this.state.errorMessage = "Could not fetch AI response. Please retry.";
+            this.state.messages.push({
+                role: "system",
+                content: "Request failed. Please retry.",
+            });
+        } finally {
+            this.state.isSending = false;
+        }
+    }
+
+    onInputKeydown(ev) {
+        if (ev.key === "Enter" && !ev.shiftKey) {
+            ev.preventDefault();
+            this.send();
+        }
     }
 
     async refreshDocumentSummary() {

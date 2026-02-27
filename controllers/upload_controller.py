@@ -1,4 +1,5 @@
 import base64
+import json
 
 from odoo import http
 from odoo.http import request
@@ -23,6 +24,7 @@ class AIUploadController(http.Controller):
                 "res_model": "prema.ai.session",
                 "res_id": session_id,
                 "type": "binary",
+                "mimetype": upload_file.content_type,
             }
         )
 
@@ -33,4 +35,15 @@ class AIUploadController(http.Controller):
             }
         )
 
-        return request.make_response("OK", headers=[("Content-Type", "text/plain")])
+        cron = request.env.ref("prema_ai_auditor.ir_cron_prema_ai_document_processing")
+        cron.sudo()._trigger()
+
+        payload = {
+            "attachment_id": attachment.id,
+            "mimetype": attachment.mimetype,
+            "name": attachment.name,
+        }
+        return request.make_response(
+            json.dumps(payload),
+            headers=[("Content-Type", "application/json")],
+        )

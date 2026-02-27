@@ -59,5 +59,15 @@ class PremaChatController(http.Controller):
 
     @http.route("/prema_ai/document_summary", type="json", auth="user")
     def document_summary(self, session_id):
-        summary = request.env["prema.ai.document.processor"].sudo().summarize_session_documents(session_id)
-        return {"summary": summary}
+        processor = request.env["prema.ai.document.processor"].sudo()
+        summary = processor.summarize_session_documents(session_id)
+        batch_summary = processor.get_batch_draft_summary(session_id)
+        return {"summary": summary, "batch_summary": batch_summary}
+
+    @http.route("/prema_ai/create_drafts", type="json", auth="user")
+    def create_drafts(self, session_id, clean_only=False):
+        request.env["prema.ai.document.processor"].sudo().create_drafts_for_session(
+            session_id=session_id,
+            clean_only=clean_only,
+        )
+        return {"status": "ok"}

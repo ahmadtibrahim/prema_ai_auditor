@@ -9,3 +9,8 @@ from . import realtime_notifier
 from . import performance_sampler
 from . import predictive_engine
 from . import config
+from . import llm_client
+from . import write_gate
+from . import ocr_service
+from . import dedupe_service
+from . import severity_classifier

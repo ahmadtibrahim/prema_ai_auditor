@@ -10,7 +10,7 @@ class PremaAIProposal(models.Model):
     name = fields.Char(required=True, default="AI Proposal")
     created_by = fields.Many2one("res.users", required=True, default=lambda self: self.env.user, readonly=True)
     target_model = fields.Char(required=True)
-    target_res_id = fields.Integer(required=True)
+    target_res_id = fields.Integer(default=0)
     action_type = fields.Selection(
         [("write", "Write"), ("create", "Create"), ("link", "Link"), ("reconcile", "Reconcile")],
         required=True,
@@ -54,11 +54,18 @@ class PremaAIProposal(models.Model):
         for proposal in self:
             if proposal.status != "approved":
                 raise UserError("Only approved proposals can be applied.")
-            if proposal.action_type != "write":
-                raise UserError("Only write proposals are supported.")
-            target = self.env[proposal.target_model].browse(proposal.target_res_id)
-            if not target.exists():
-                proposal.write({"status": "failed", "error_trace_masked": "Target record does not exist."})
+            if proposal.action_type == "write":
+                target = self.env[proposal.target_model].browse(proposal.target_res_id)
+                if not target.exists():
+                    proposal.write({"status": "failed", "error_trace_masked": "Target record does not exist."})
+                    continue
+                target.write(proposal.payload_json)
+                proposal.write({"status": "applied", "apply_log": "Write proposal applied successfully."})
                 continue
-            target.write(proposal.payload_json)
-            proposal.write({"status": "applied", "apply_log": "Proposal applied successfully."})
+
+            if proposal.action_type == "create":
+                created = self.env[proposal.target_model].create(proposal.payload_json)
+                proposal.write({"status": "applied", "apply_log": f"Create proposal applied successfully (ID {created.id})."})
+                continue
+
+            raise UserError("Unsupported proposal action type.")

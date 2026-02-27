@@ -57,6 +57,18 @@ class PremaChatController(http.Controller):
         response["reply"] = reply
         return response
 
+
+    @http.route("/prema_ai/incidents", type="json", auth="user")
+    def incidents(self, limit=20):
+        records = request.env["prema.ai.incident"].sudo().search([], order="create_date desc", limit=limit)
+        return [{"id": rec.id, "name": rec.name, "severity": rec.severity, "state": rec.state} for rec in records]
+
+    @http.route("/prema_ai/schema_model", type="json", auth="user")
+    def schema_model(self, model_name):
+        wizard = request.env["prema.schema.browser"].sudo().create({"model_name": model_name})
+        wizard.action_load_fields()
+        return {"model": model_name, "fields": wizard.field_lines}
+
     @http.route("/prema_ai/document_summary", type="json", auth="user")
     def document_summary(self, session_id):
         processor = request.env["prema.ai.document.processor"].sudo()

@@ -238,27 +238,25 @@ class AIDocumentProcessor(models.AbstractModel):
         for doc in docs:
             if doc.flag_duplicate and clean_only:
                 continue
-            move = self.env["account.move"].sudo().create(
+            proposal = self.env["prema.ai.proposal"].sudo().create(
                 {
-                    "move_type": "in_invoice",
-                    "state": "draft",
-                    "ref": doc.invoice_number or doc.attachment_id.name,
-                    "invoice_date": doc.invoice_date,
-                    "invoice_line_ids": [
-                        (
-                            0,
-                            0,
-                            {
-                                "name": "AI Draft Placeholder",
-                                "quantity": 1,
-                                "price_unit": doc.amount_total or 0.0,
-                            },
-                        )
-                    ],
+                    "name": f"Draft bill proposal: {doc.attachment_id.name}",
+                    "target_model": "account.move",
+                    "target_res_id": 0,
+                    "action_type": "create",
+                    "payload_json": {
+                        "move_type": "in_invoice",
+                        "ref": doc.invoice_number or doc.attachment_id.name,
+                        "invoice_date": doc.invoice_date.isoformat() if doc.invoice_date else False,
+                        "invoice_line_ids": [
+                            (0, 0, {"name": "AI Draft Placeholder", "quantity": 1, "price_unit": doc.amount_total or 0.0})
+                        ],
+                    },
+                    "rationale": "Generated from uploaded document analysis. Requires explicit approval/apply.",
+                    "status": "pending_approval",
                 }
             )
-            doc.write({"move_id": move.id, "status": "draft_created"})
-            doc.attachment_id.write({"res_model": "account.move", "res_id": move.id})
+            doc.write({"status": "draft_created", "advice": f"Draft proposal generated: {proposal.name}"})
 
 
 class AIDocumentProcessorCron(models.Model):

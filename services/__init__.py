@@ -5,3 +5,6 @@ from . import model_introspector
 from . import tool_registry
 from . import anomaly_engine
 from . import performance_guard
+from . import realtime_notifier
+from . import performance_sampler
+from . import predictive_engine

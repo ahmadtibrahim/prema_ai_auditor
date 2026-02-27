@@ -11,7 +11,56 @@ class ToolRegistry(models.AbstractModel):
             "scan_unreconciled_bank": self._scan_unreconciled_bank,
             "scan_gst_anomalies": self._scan_gst_anomalies,
             "scan_duplicate_bills": self._scan_duplicate_bills,
+            "validate_gst_integrity": self.env["prema.cra.engine"].validate_gst_integrity,
+            "validate_zero_tax_vendor": self.env["prema.cra.engine"].validate_zero_tax_vendor,
+            "detect_outliers": self.env["prema.anomaly.engine"].detect_outliers,
+            "suggest_matches": self.env["prema.reconcile.advisor"].suggest_matches,
+            "validate_fx_variance": self.env["prema.fx.validator"].validate_fx_variance,
         }
+
+    def get_tool_definitions(self):
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "validate_gst_integrity",
+                    "description": "Validate posted vendor bills with GST amounts have an attached PDF invoice.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "validate_zero_tax_vendor",
+                    "description": "Find Canadian vendors with zero-tax invoices.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "detect_outliers",
+                    "description": "Detect invoice amount outliers using standard deviation.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "suggest_matches",
+                    "description": "Suggest bank reconciliation candidates by exact amount matching.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "validate_fx_variance",
+                    "description": "Validate posted foreign-currency invoices for material FX variance.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
+        ]
 
     def execute(self, tool_name, args):
         tools = self.get_tools()

@@ -1,13 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
-    <t t-name="prema_ai_auditor.PremaAIChat">
-        <div class="o_prema_ai_chat p-3">
-            <h3>Prema AI Auditor Chat</h3>
-            <textarea t-model="state.input" class="form-control" rows="4" placeholder="Ask audit question..."/>
-            <button class="btn btn-primary mt-2" t-on-click="sendMessage" t-att-disabled="state.loading">
-                <t t-esc="state.loading ? 'Sending...' : 'Send'"/>
-            </button>
-            <pre class="mt-3"><t t-esc="state.output"/></pre>
+    <t t-name="prema_ai_auditor.ChatTemplate">
+        <div class="o_prema_ai_workspace">
+            <div class="o_prema_header">
+                <h2>Prema AI Auditor</h2>
+                <div>Health Score: <t t-esc="state.healthScore"/>%</div>
+            </div>
+
+            <div class="o_prema_chat_window">
+                <t t-foreach="state.messages" t-as="msg" t-key="msg.content + msg.role + msg_index">
+                    <div t-att-class="'msg ' + msg.role">
+                        <t t-esc="msg.content"/>
+                    </div>
+                </t>
+            </div>
+
+            <div class="o_prema_input">
+                <input t-model="state.input" placeholder="Ask AI Auditor..."/>
+                <button t-on-click="send">Send</button>
+            </div>
         </div>
     </t>
 </templates>

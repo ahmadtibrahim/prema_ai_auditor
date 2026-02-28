@@ -53,10 +53,4 @@
             </form>
         </field>
     </record>
-
-    <record id="action_prema_cleanup_plan" model="ir.actions.act_window">
-        <field name="name">Cleanup Plans</field>
-        <field name="res_model">prema.cleanup.plan</field>
-        <field name="view_mode">tree,form</field>
-    </record>
 </odoo>

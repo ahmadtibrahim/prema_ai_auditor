@@ -24,6 +24,7 @@
         "views/audit_log_action.xml",
         "views/monitoring_dashboard.xml",
         "views/cleanup_views.xml",
+        "views/ai_chat_views.xml",
         "views/audit_dashboard_views.xml",
         "views/audit_log_views.xml",
         "views/proposal_views.xml",
@@ -33,7 +34,7 @@
     ],
     "assets": {
         "web.assets_backend": [
-            "prema_ai_auditor/static/src/js/chat.js",
+            "prema_ai_auditor/static/src/js/ai_chat.js",
             "prema_ai_auditor/static/src/components/ai_chat_upload/ai_chat_upload.js",
             "prema_ai_auditor/static/src/xml/chat_templates.xml",
             "prema_ai_auditor/static/src/components/ai_chat_upload/ai_chat_upload.xml",

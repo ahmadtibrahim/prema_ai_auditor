@@ -4,13 +4,15 @@ import { Component, useState, useRef, onPatched } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { AIChatUpload } from "../components/ai_chat_upload/ai_chat_upload";
 
-class PremaChat extends Component {
+class PremaAIChat extends Component {
     static components = { AIChatUpload };
 
     setup() {
         this.rpc = this.env.services?.rpc || null;
         this.bus = this.env.services?.bus_service || null;
         this.chatWindowRef = useRef("chatWindow");
+        const actionContext = this.props.action?.context || {};
+        const aiEnabled = actionContext.ai_enabled;
         this.state = useState({
             messages: [],
             input: "",
@@ -20,9 +22,10 @@ class PremaChat extends Component {
             showBatchModal: false,
             isSending: false,
             errorMessage: "",
+            showAiDisabledWarning: !aiEnabled,
             batchSummary: { total: 0, clean: 0, duplicate: 0, missing_vendor: 0 },
             incidents: [],
-            schemaModel: "account.move",
+            schemaModel: actionContext.model_name || "account.move",
             schemaFields: "",
         });
 
@@ -175,5 +178,7 @@ class PremaChat extends Component {
     }
 }
 
-PremaChat.template = "prema_ai_auditor.ChatTemplate";
-registry.category("actions").add("prema_ai_chat", PremaChat);
+PremaAIChat.template = "prema_ai_auditor.ChatTemplate";
+registry.category("actions").add("prema_ai_chat_action", {
+    component: PremaAIChat,
+});

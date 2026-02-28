@@ -4,7 +4,7 @@
         <field name="name">prema.ai.proposal.tree</field>
         <field name="model">prema.ai.proposal</field>
         <field name="arch" type="xml">
-            <list>
+            <tree>
                 <field name="create_date"/>
                 <field name="target_model"/>
                 <field name="target_res_id"/>
@@ -12,7 +12,7 @@
                 <field name="severity"/>
                 <field name="risk_score"/>
                 <field name="status"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -20,7 +20,7 @@
         <field name="name">prema.ai.proposal.form</field>
         <field name="model">prema.ai.proposal</field>
         <field name="arch" type="xml">
-            <form>
+            <form string="AI Proposal">
                 <header>
                     <button name="action_submit_for_approval" type="object" string="Submit" invisible="status != 'draft'"/>
                     <button name="action_approve" type="object" string="Approve" invisible="status != 'pending_approval'"/>
@@ -29,21 +29,35 @@
                     <field name="status" widget="statusbar"/>
                 </header>
                 <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
                     <group>
-                        <field name="name"/>
-                        <field name="created_by" readonly="1"/>
-                        <field name="target_model"/>
-                        <field name="target_res_id"/>
-                        <field name="action_type"/>
-                        <field name="severity"/>
-                        <field name="risk_score"/>
+                        <group>
+                            <field name="created_by" readonly="1"/>
+                            <field name="target_model"/>
+                            <field name="target_res_id"/>
+                            <field name="action_type"/>
+                            <field name="severity"/>
+                            <field name="risk_score"/>
+                        </group>
                     </group>
-                    <group>
-                        <field name="rationale"/>
-                        <field name="payload_json" widget="json"/>
-                        <field name="apply_log" readonly="1"/>
-                        <field name="error_trace_masked" readonly="1"/>
-                    </group>
+                    <notebook>
+                        <page string="Details">
+                            <group>
+                                <field name="rationale"/>
+                                <field name="payload_json" widget="json"/>
+                            </group>
+                        </page>
+                        <page string="Execution Log">
+                            <group>
+                                <field name="apply_log" readonly="1"/>
+                                <field name="error_trace_masked" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>

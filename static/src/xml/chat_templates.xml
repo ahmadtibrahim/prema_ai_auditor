@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="prema_ai_auditor.ChatTemplate">
-        <div class="o_prema_ai_workspace">
+        <div class="o_prema_ai_chat_root">
             <div class="o_prema_header">
                 <h2>Prema AI Auditor</h2>
                 <div>Health Score: <t t-esc="state.healthScore"/>%</div>
             </div>
 
             <AIChatUpload sessionId="state.sessionId" onUploaded.bind="refreshDocumentSummary"/>
+
+            <div class="alert alert-warning mt-2" t-if="state.showAiDisabledWarning">
+                AI is disabled for this action context.
+            </div>
 
             <div class="o_prema_input mt-2">
                 <select t-model="state.mode" class="form-select form-select-sm">

@@ -19,10 +19,4 @@
         </field>
     </record>
 
-    <record id="action_prema_ai_dashboard" model="ir.actions.act_window">
-        <field name="name">Dashboard</field>
-        <field name="res_model">prema.audit.log</field>
-        <field name="view_mode">kanban,list,form</field>
-        <field name="view_id" ref="view_prema_ai_dashboard"/>
-    </record>
 </odoo>

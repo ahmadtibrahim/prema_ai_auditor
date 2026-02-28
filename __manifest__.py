@@ -17,6 +17,7 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "views/chat_action.xml",
+        "views/dashboard_action.xml",
         "views/audit_log_action.xml",
         "views/menu.xml",
         "views/monitoring_dashboard.xml",

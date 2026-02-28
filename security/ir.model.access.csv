@@ -14,3 +14,4 @@ access_prema_ai_document_processor_cron_master,access.prema.ai.document.processo
 access_prema_ai_proposal_master,access.prema.ai.proposal.master,model_prema_ai_proposal,prema_ai_auditor.group_prema_ai_master,1,1,1,1
 
 access_prema_ai_incident_master,access.prema.ai.incident.master,model_prema_ai_incident,prema_ai_auditor.group_prema_ai_master,1,1,1,0
+access_prema_ai_dashboard_master,access.prema.ai.dashboard.master,model_prema_ai_dashboard,prema_ai_auditor.group_prema_ai_master,1,1,1,0

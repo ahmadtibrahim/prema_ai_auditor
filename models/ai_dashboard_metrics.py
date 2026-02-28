@@ -1,9 +1,8 @@
 from odoo import models
 
 
-class AIDashboardMetrics(models.AbstractModel):
-    _name = "prema.ai.dashboard"
-    _description = "Prema AI Dashboard Metrics"
+class AIDashboardMetrics(models.Model):
+    _inherit = "prema.ai.dashboard"
 
     def severity_counts(self):
         logs = self.env["prema.audit.log"].search([("status", "=", "open")])

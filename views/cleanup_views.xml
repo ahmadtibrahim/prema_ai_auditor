@@ -43,7 +43,7 @@
                         </page>
                         <page string="Steps">
                             <field name="step_ids">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="sequence" width="60"/>
                                     <field name="action_type"/>
                                     <field name="model_name"/>
@@ -51,7 +51,7 @@
                                     <field name="severity"/>
                                     <field name="approved"/>
                                     <field name="executed"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                     </notebook>

@@ -2,15 +2,14 @@
 
 import { Component, useState, useRef, onPatched } from "@odoo/owl";
 import { registry } from "@web/core/registry";
-import { useService } from "@web/core/utils/hooks";
 import { AIChatUpload } from "../components/ai_chat_upload/ai_chat_upload";
 
 class PremaChat extends Component {
     static components = { AIChatUpload };
 
     setup() {
-        this.rpc = useService("rpc");
-        this.bus = useService("bus_service");
+        this.rpc = this.env.services?.rpc || null;
+        this.bus = this.env.services?.bus_service || null;
         this.chatWindowRef = useRef("chatWindow");
         this.state = useState({
             messages: [],
@@ -27,9 +26,21 @@ class PremaChat extends Component {
             schemaFields: "",
         });
 
+        if (!this.rpc) {
+            this.state.errorMessage = "Chat service is unavailable in this context.";
+            this.state.messages.push({
+                role: "system",
+                content: "Chat service is unavailable in this context.",
+            });
+            return;
+        }
+
         this._initializeSession();
-        this.bus.addChannel("prema_ai_channel");
-        this.bus.addEventListener("notification", this.onNotification.bind(this));
+
+        if (this.bus) {
+            this.bus.addChannel("prema_ai_channel");
+            this.bus.addEventListener("notification", this.onNotification.bind(this));
+        }
 
         onPatched(() => {
             const el = this.chatWindowRef.el;
@@ -40,6 +51,9 @@ class PremaChat extends Component {
     }
 
     async _initializeSession() {
+        if (!this.rpc) {
+            return;
+        }
         const session = await this.rpc("/prema_ai/session", {});
         this.state.sessionId = session.id;
     }
@@ -99,7 +113,7 @@ class PremaChat extends Component {
     }
 
     async refreshDocumentSummary() {
-        if (!this.state.sessionId) {
+        if (!this.rpc || !this.state.sessionId) {
             return;
         }
         const response = await this.rpc("/prema_ai/document_summary", {
@@ -122,11 +136,14 @@ class PremaChat extends Component {
     }
 
     async loadIncidents() {
+        if (!this.rpc) {
+            return;
+        }
         this.state.incidents = await this.rpc("/prema_ai/incidents", { limit: 20 });
     }
 
     async loadSchemaModel() {
-        if (!this.state.schemaModel) {
+        if (!this.rpc || !this.state.schemaModel) {
             return;
         }
         const response = await this.rpc("/prema_ai/schema_model", { model_name: this.state.schemaModel });
@@ -134,6 +151,9 @@ class PremaChat extends Component {
     }
 
     async createCleanOnlyDrafts() {
+        if (!this.rpc || !this.state.sessionId) {
+            return;
+        }
         await this.rpc("/prema_ai/create_drafts", {
             session_id: this.state.sessionId,
             clean_only: true,
@@ -143,6 +163,9 @@ class PremaChat extends Component {
     }
 
     async createAllDrafts() {
+        if (!this.rpc || !this.state.sessionId) {
+            return;
+        }
         await this.rpc("/prema_ai/create_drafts", {
             session_id: this.state.sessionId,
             clean_only: false,

@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <menuitem
-        id="menu_prema_ai_root"
-        name="Prema AI Auditor"
-        sequence="10"
-        web_icon="prema_ai_auditor,static/description/icon.png"
+    id="menu_prema_ai_root"
+    name="Prema AI Auditor"
+    sequence="10"
+    web_icon="prema_ai_auditor,static/description/icon.png"
+    groups="base.group_user"
     />
     <menuitem id="menu_prema_ai_chat" name="AI Chat" parent="menu_prema_ai_root" action="action_prema_ai_chat"/>
     <menuitem id="menu_prema_ai_logs" name="Audit Logs" parent="menu_prema_ai_root" action="action_prema_audit_log"/>

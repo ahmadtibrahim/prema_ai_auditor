@@ -15,34 +15,10 @@
 - None
 
 ## Wrong load order
-- `__manifest__.py` data list is not in strict sequence: security -> data/actions -> views -> menus
+- None
 
 ## Security gaps
 - None
-- Models without explicit access rule:
-  - `prema.ai.config.audit`
-  - `prema.ai.document.processor`
-  - `prema.ai.error.monitor`
-  - `prema.ai.integrity.engine`
-  - `prema.ai.mail.monitor`
-  - `prema.ai.performance`
-  - `prema.ai.predictive`
-  - `prema.ai.realtime`
-  - `prema.ai.self.heal`
-  - `prema.ai.severity`
-  - `prema.ai.write.gate`
-  - `prema.anomaly.engine`
-  - `prema.approval.engine`
-  - `prema.audit.engine`
-  - `prema.cra.engine`
-  - `prema.fx.validator`
-  - `prema.health.score`
-  - `prema.integrity.scanner`
-  - `prema.mapping.validator`
-  - `prema.reconcile.advisor`
-  - `prema.risk.matrix`
-  - `prema.schema.browser`
-  - `prema.tool.registry`
 
 ## Odoo 18 list view migration
 - Any remaining `<tree>` architecture tags and `view_mode=tree` must be migrated to `<list>` and `view_mode=list`.

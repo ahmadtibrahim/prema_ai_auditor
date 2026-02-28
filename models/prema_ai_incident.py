@@ -35,5 +35,5 @@ class PremaAIIncident(models.Model):
             "company_id": self.env.company.id,
         }
         incident = self.create(vals)
-        self.env["prema.realtime.notifier"].notify_incident(incident)
+        self.env["prema.ai.realtime.notifier"].notify_incident(incident)
         return incident

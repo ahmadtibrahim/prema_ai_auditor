@@ -10,3 +10,12 @@ class RealtimeNotifier(models.AbstractModel):
 
     def notify_performance(self, payload):
         self.env["prema.ai.realtime"].push_event("performance", payload)
+    def notify_incident(self, incident):
+        payload = {
+            "id": incident.id,
+            "name": incident.name,
+            "severity": incident.severity,
+            "state": incident.state,
+        }
+        self.env["prema.ai.realtime"].push_event("incident", payload)
+

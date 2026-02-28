@@ -4,7 +4,7 @@
         <field name="name">prema.ai.proposal.tree</field>
         <field name="model">prema.ai.proposal</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="create_date"/>
                 <field name="target_model"/>
                 <field name="target_res_id"/>
@@ -12,7 +12,7 @@
                 <field name="severity"/>
                 <field name="risk_score"/>
                 <field name="status"/>
-            </tree>
+            </list>
         </field>
     </record>
 

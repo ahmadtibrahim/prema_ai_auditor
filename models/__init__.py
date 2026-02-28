@@ -9,8 +9,8 @@ from . import cra_rule_engine
 from . import anomaly_engine
 from . import reconciliation_advisor
 from . import fx_validator
-from . import cleanup_plan
 from . import cleanup_step
+from . import cleanup_plan
 from . import integrity_scanner
 from . import risk_matrix
 from . import ai_session

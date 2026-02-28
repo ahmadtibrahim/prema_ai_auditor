@@ -16,6 +16,8 @@
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
+        "data/default_rules.xml",
+        "data/cron.xml",
         "views/chat_action.xml",
         "views/dashboard_action.xml",
         "views/cleanup_plan_action.xml",
@@ -28,8 +30,6 @@
         "views/config_audit_views.xml",
         "views/schema_viewer_views.xml",
         "views/menu.xml",
-        "data/default_rules.xml",
-        "data/cron.xml",
     ],
     "assets": {
         "web.assets_backend": [

@@ -17,33 +17,28 @@ class PremaAISession(models.Model):
     user_id = fields.Many2one("res.users", default=lambda self: self.env.user)
     message_ids = fields.One2many("prema.ai.message", "session_id")
 
-    def send_message(self, content):
+    def send_message(self, message):
         self.ensure_one()
 
-        if self.user_id != self.env.user:
-            raise UserError("You can only send messages in your own sessions.")
+        if not message:
+            return ""
 
-        message_text = (content or "").strip()
-        if not message_text:
-            raise UserError("Message content cannot be empty.")
+        # create user message
+        user_msg = self.env["prema.ai.message"].create({
+            "session_id": self.id,
+            "role": "user",
+            "content": message,
+        })
 
-        self.env["prema.ai.message"].create(
-            {
-                "session_id": self.id,
-                "role": "user",
-                "content": message_text,
-            }
-        )
-
+        # call OpenAI
         assistant_reply = self._call_openai()
 
-        self.env["prema.ai.message"].create(
-            {
-                "session_id": self.id,
-                "role": "assistant",
-                "content": assistant_reply,
-            }
-        )
+        # store assistant reply
+        self.env["prema.ai.message"].create({
+            "session_id": self.id,
+            "role": "assistant",
+            "content": assistant_reply,
+        })
 
         return assistant_reply
 

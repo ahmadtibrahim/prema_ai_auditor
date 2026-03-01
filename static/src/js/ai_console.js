@@ -49,7 +49,13 @@ class AIConsole extends Component {
         }
 
         try {
-            const reply = await this.orm.call("prema.ai.session", "send_message", [this.state.activeSessionId, messageText]);
+            this.sessionId = this.state.activeSessionId;
+            const message = messageText;
+            const reply = await this.orm.call(
+                "prema.ai.session",
+                "send_message",
+                [this.sessionId, message]
+            );
             this.state.messages.push({ role: "user", content: messageText });
             this.state.messages.push({ role: "assistant", content: reply });
             this.state.input = "";

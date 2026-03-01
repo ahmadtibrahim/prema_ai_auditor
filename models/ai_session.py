@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import models, fields
 import requests
 import json
 
@@ -74,9 +74,8 @@ class PremaAISession(models.Model):
     # DOCUMENT ANALYSIS (VISION)
     # =====================================================
 
-    @api.model
-    def analyze_uploaded_document(self, *args, **kwargs):
-        attachment_id = kwargs.get("attachment_id")
+    def analyze_uploaded_document(self, attachment_id):
+        self.ensure_one()
 
         if not attachment_id:
             raise ValueError("attachment_id is required.")
@@ -92,6 +91,8 @@ class PremaAISession(models.Model):
         file_base64 = attachment.datas
         if not file_base64:
             raise ValueError("Attachment has no data.")
+        if isinstance(file_base64, bytes):
+            file_base64 = file_base64.decode()
 
         response = requests.post(
             "https://api.openai.com/v1/responses",
@@ -133,13 +134,15 @@ class PremaAISession(models.Model):
 
         document = self.env["prema.ai.document"].create({
             "name": attachment.name,
+            "session_id": self.id,
             "attachment_id": attachment.id,
-            "raw_ai_response": output_text,
+            "ai_summary": output_text,
             "status": "analyzed",
         })
 
         self.env["prema.ai.tool.log"].create({
             "user_id": self.env.user.id,
+            "session_id": self.id,
             "tool_name": "analyze_document",
             "input_payload": json.dumps({"attachment_id": attachment_id}),
             "output_payload": output_text,
@@ -149,6 +152,7 @@ class PremaAISession(models.Model):
         return {
             "document_id": document.id,
             "parsed_data": output_text,
+            "status": document.status,
         }
 
     # =====================================================

@@ -19,7 +19,8 @@
                        t-key="sess.id">
 
                         <div class="o_ai_session_item"
-                             t-att-class="{'active': sess.id === state.activeSessionId}">
+                             t-att-class="{'active': sess.id === state.activeSessionId}"
+                             t-on-click="() => selectSession(sess.id)">
 
                             <!-- Editable session name -->
                             <input type="text"
@@ -32,9 +33,6 @@
                             <i class="fa fa-trash o_ai_delete_icon"
                                t-on-click.stop="() => deleteSession(sess.id)"/>
 
-                            <!-- Click area to select -->
-                            <div class="o_ai_select_overlay"
-                                 t-on-click="() => selectSession(sess.id)"/>
                         </div>
 
                     </t>

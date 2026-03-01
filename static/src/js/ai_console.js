@@ -3,6 +3,7 @@
 import { registry } from "@web/core/registry";
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { session } from "@web/session";
 
 class AIConsole extends Component {
 
@@ -91,11 +92,9 @@ class AIConsole extends Component {
                 "prema.ai.session",
                 [{
                     name: "New Chat",
-                    user_id: this.env.session.uid,
+                    user_id: session.uid,
                 }]
             );
-
-            this.notification.add("Session created successfully", { type: "success" });
 
             await this.loadSessions();
             this.state.activeSessionId = sessionId;

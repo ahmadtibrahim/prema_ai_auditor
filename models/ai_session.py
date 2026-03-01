@@ -76,13 +76,20 @@ class PremaAISession(models.Model):
 
     @api.model
     def analyze_uploaded_document(self, *args, **kwargs):
-        session_ids = args[0] if args else []
+        session_arg = args[0] if args else []
         attachment_id = kwargs.get("attachment_id")
 
-        if not session_ids:
+        if isinstance(session_arg, int):
+            session_id = session_arg
+        elif isinstance(session_arg, (list, tuple)) and session_arg:
+            session_id = session_arg[0]
+        else:
+            session_id = False
+
+        if not session_id:
             raise ValueError("Session context missing.")
 
-        session = self.browse(session_ids[0])
+        session = self.browse(session_id)
         session.ensure_one()
 
         if not attachment_id:

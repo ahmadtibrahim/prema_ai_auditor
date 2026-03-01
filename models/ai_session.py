@@ -48,6 +48,28 @@ class PremaAISession(models.Model):
     # CHAT MESSAGE ENTRYPOINT
     # =====================================================
 
+    def action_rename_session(self, new_name):
+        self.ensure_one()
+
+        if self.user_id != self.env.user:
+            raise UserError("You can only rename your own chat sessions.")
+
+        sanitized_name = (new_name or "").strip()
+        if not sanitized_name:
+            raise UserError("Session name cannot be empty.")
+
+        self.write({"name": sanitized_name})
+        return {"id": self.id, "name": sanitized_name}
+
+    def action_delete_session(self):
+        self.ensure_one()
+
+        if self.user_id != self.env.user:
+            raise UserError("You can only delete your own chat sessions.")
+
+        self.unlink()
+        return True
+
     def send_user_message(self, content):
         self.ensure_one()
 

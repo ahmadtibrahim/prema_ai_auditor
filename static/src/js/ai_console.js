@@ -4,12 +4,12 @@ import { registry } from "@web/core/registry";
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { session } from "@web/session";
+import { rpc } from "@web/core/network/rpc";
 
 class AIConsole extends Component {
 
     setup() {
         this.notification = useService("notification");
-        this.orm = useService("orm");
 
         this.state = useState({
             sessions: [],
@@ -39,11 +39,7 @@ class AIConsole extends Component {
 
     async loadSessions() {
         try {
-            const sessions = await this.orm.searchRead(
-                "prema.ai.session",
-                [],
-                ["name"]
-            );
+            const sessions = await this.callKw("prema.ai.session", "search_read", [[], ["name"]]);
 
             this.state.sessions = sessions;
             this.state.savedSessionNames = Object.fromEntries(
@@ -64,10 +60,10 @@ class AIConsole extends Component {
         if (!this.state.activeSessionId) return;
 
         try {
-            const messages = await this.orm.searchRead(
+            const messages = await this.callKw(
                 "prema.ai.message",
-                [["session_id", "=", this.state.activeSessionId]],
-                ["role", "content"]
+                "search_read",
+                [[["session_id", "=", this.state.activeSessionId]], ["role", "content"]]
             );
 
             this.state.messages = messages;
@@ -88,12 +84,13 @@ class AIConsole extends Component {
 
     async createNewSession() {
         try {
-            const sessionId = await this.orm.create(
+            const sessionId = await this.callKw(
                 "prema.ai.session",
-                [{
+                "create",
+                [[{
                     name: "New Chat",
                     user_id: session.uid,
-                }]
+                }]]
             );
 
             await this.loadSessions();
@@ -127,11 +124,7 @@ class AIConsole extends Component {
         this.state.renamingSessionIds = [...this.state.renamingSessionIds, session.id];
 
         try {
-            await this.orm.call(
-                "prema.ai.session",
-                "action_rename_session",
-                [[session.id], newName]
-            );
+            await this.callKw("prema.ai.session", "action_rename_session", [[session.id], newName]);
 
             await this.loadSessions();
             this.notification.add("Session renamed", {
@@ -158,11 +151,7 @@ class AIConsole extends Component {
         this.state.deletingSessionIds = [...this.state.deletingSessionIds, sessionId];
 
         try {
-            await this.orm.call(
-                "prema.ai.session",
-                "action_delete_session",
-                [[sessionId]]
-            );
+            await this.callKw("prema.ai.session", "action_delete_session", [[sessionId]]);
 
             if (this.state.activeSessionId === sessionId) {
                 this.state.activeSessionId = null;
@@ -193,11 +182,7 @@ class AIConsole extends Component {
         if (!this.state.input.trim() || !this.state.activeSessionId) return;
 
         try {
-            const result = await this.orm.call(
-                "prema.ai.session",
-                "send_user_message",
-                [[this.state.activeSessionId], this.state.input]
-            );
+            const result = await this.callKw("prema.ai.session", "send_user_message", [[this.state.activeSessionId], this.state.input]);
 
             this.state.messages.push(result.user);
             this.state.messages.push(result.assistant);
@@ -277,16 +262,16 @@ class AIConsole extends Component {
         }
 
         try {
-            const attachmentId = await this.orm.create("ir.attachment", [{
+            const attachmentId = await this.callKw("ir.attachment", "create", [[{
                 name: this.state.uploadName,
                 type: "binary",
                 datas: this.state.uploadData,
                 mimetype: this.state.uploadMimeType || "application/pdf",
                 res_model: "prema.ai.session",
                 res_id: this.state.activeSessionId,
-            }]);
+            }]]);
 
-            const result = await this.orm.call(
+            const result = await this.callKw(
                 "prema.ai.session",
                 "analyze_uploaded_document",
                 [],
@@ -316,7 +301,7 @@ class AIConsole extends Component {
         }
 
         try {
-            const result = await this.orm.call(
+            const result = await this.callKw(
                 "prema.ai.session",
                 "create_draft_bill_from_ai",
                 [[this.state.activeSessionId]],
@@ -332,6 +317,15 @@ class AIConsole extends Component {
             console.error(error);
             this.notification.add("Failed to create draft bill", { type: "danger" });
         }
+    }
+
+    callKw(model, method, args = [], kwargs = {}) {
+        return rpc("/web/dataset/call_kw", {
+            model,
+            method,
+            args,
+            kwargs,
+        });
     }
 }
 

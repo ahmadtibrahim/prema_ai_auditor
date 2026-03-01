@@ -104,8 +104,12 @@ class PremaAISession(models.Model):
         if not attachment_id:
             raise UserError("Attachment ID missing.")
 
+        attachment = self.env["ir.attachment"].browse(attachment_id)
+        if not attachment.exists():
+            raise UserError("Attachment not found.")
+
         session = self.create({
-            "name": "Document Analysis Session",
+            "name": "Document Analysis",
             "user_id": self.env.user.id,
         })
 
@@ -118,10 +122,6 @@ class PremaAISession(models.Model):
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-
-        attachment = session.env["ir.attachment"].browse(attachment_id)
-        if not attachment:
-            raise UserError("No document uploaded.")
 
         if not attachment.datas:
             raise UserError("Empty file.")

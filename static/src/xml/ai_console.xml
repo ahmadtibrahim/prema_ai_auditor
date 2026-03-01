@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+<t t-name="prema_ai_console.AIConsole">
+
+<div class="d-flex" style="height:100vh;">
+
+    <!-- SIDEBAR -->
+    <div class="border-end p-2" style="width:280px; overflow:auto;">
+        <button class="btn btn-primary w-100 mb-2"
+                t-on-click="createNewSession">
+            + New Chat
+        </button>
+
+        <t t-foreach="state.sessions" t-as="session" t-key="session.id">
+            <div class="d-flex justify-content-between p-2 border-bottom"
+                 t-on-click="() => selectSession(session.id)">
+                <span t-esc="session.name"/>
+                <div>
+                    <i class="fa fa-pencil me-2"
+                       t-on-click.stop="() => renameSession(session.id)"/>
+                    <i class="fa fa-trash text-danger"
+                       t-on-click.stop="() => deleteSession(session.id)"/>
+                </div>
+            </div>
+        </t>
+    </div>
+
+    <!-- CHAT AREA -->
+    <div class="flex-grow-1 d-flex flex-column">
+
+        <div class="flex-grow-1 p-3 overflow-auto">
+            <t t-foreach="state.messages" t-as="msg" t-key="msg.id">
+                <div t-att-class="msg.role === 'user' ? 'text-end mb-2' : 'text-start mb-2'">
+                    <div class="badge bg-secondary p-2">
+                        <t t-esc="msg.content"/>
+                    </div>
+                </div>
+            </t>
+        </div>
+
+        <div class="p-3 border-top">
+            <input type="text"
+                   class="form-control"
+                   placeholder="Type your message..."
+                   t-model="state.input"
+                   t-on-keydown="handleKeyDown"/>
+        </div>
+
+    </div>
+
+</div>
+
+</t>
+</templates>

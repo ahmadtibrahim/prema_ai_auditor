@@ -25,35 +25,41 @@ class PremaAISession(models.Model):
         )
         return sessions.read(["id", "name"])
 
-    def rename_session(self, new_name):
-        self.ensure_one()
-        self.name = new_name
+    @api.model
+    def rename_session(self, session_id, new_name):
+        session = self.browse(session_id)
+        session.ensure_one()
+        session.name = new_name
         return True
 
-    def delete_session(self):
-        self.ensure_one()
-        self.unlink()
+    @api.model
+    def delete_session(self, session_id):
+        session = self.browse(session_id)
+        session.ensure_one()
+        session.unlink()
         return True
 
-    def send_message(self, message):
-        self.ensure_one()
+    @api.model
+    def send_message(self, session_id, message):
+        session = self.browse(session_id)
+        session.ensure_one()
 
         if not message:
             return ""
 
         # create user message
-        user_msg = self.env["prema.ai.message"].create({
-            "session_id": self.id,
+        self.env["prema.ai.message"].create({
+            "session_id": session.id,
             "role": "user",
             "content": message,
         })
 
         # call OpenAI
-        assistant_reply = self._call_openai()
+        assistant_reply = session._call_openai()
 
         # store assistant reply
         self.env["prema.ai.message"].create({
-            "session_id": self.id,
+            "session_id": session.id,
             "role": "assistant",
             "content": assistant_reply,
         })

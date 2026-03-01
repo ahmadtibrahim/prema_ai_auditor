@@ -10,7 +10,7 @@
     "assets": {
         "web.assets_backend": [
             "prema_ai_auditor/static/src/js/ai_console.js",
-            "prema_ai_auditor/static/src/xml/ai_console_templates.xml",
+            "prema_ai_auditor/static/src/xml/ai_console.xml",
             "prema_ai_auditor/static/src/css/ai_console.css",
         ],
     },

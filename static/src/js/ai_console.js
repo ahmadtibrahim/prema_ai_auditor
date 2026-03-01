@@ -283,7 +283,7 @@ class AIConsole extends Component {
                 name: this.state.uploadName,
                 type: "binary",
                 datas: this.state.uploadData,
-                mimetype: "application/pdf",
+                mimetype: this.state.uploadMimeType || "application/pdf",
                 res_model: "prema.ai.session",
                 res_id: this.state.activeSessionId,
             }]);
@@ -294,6 +294,14 @@ class AIConsole extends Component {
                 [this.state.activeSessionId],
                 { attachment_id: attachmentId }
             );
+
+            const parsedDocument = typeof result.parsed_data === "string"
+                ? null
+                : (result.parsed_data || null);
+            this.state.parsedDocument = parsedDocument;
+            this.state.analyzedAttachmentId = attachmentId;
+            this.state.documentStatus = result.status || "analyzed";
+            this.notification.add("Document analyzed successfully", { type: "success" });
 
             console.log("Analyze success:", result);
         } catch (error) {

@@ -2,6 +2,8 @@ from odoo import api, models, fields
 from odoo.exceptions import UserError
 import requests
 import json
+import base64
+import binascii
 
 
 class PremaAISession(models.Model):
@@ -114,6 +116,8 @@ class PremaAISession(models.Model):
 
         session = self.browse(session_id)
         session.ensure_one()
+        if session.user_id != self.env.user:
+            raise UserError("You can only analyze documents in your own sessions.")
 
         if not attachment_id:
             raise UserError("attachment_id is required.")
@@ -124,7 +128,10 @@ class PremaAISession(models.Model):
 
         attachment = self.env["ir.attachment"].browse(attachment_id)
         if not attachment or not attachment.datas:
-            raise ValueError("Attachment is empty or invalid.")
+            raise UserError("Attachment is empty or invalid.")
+
+        if attachment.res_model != "prema.ai.session" or attachment.res_id != session.id:
+            raise UserError("Attachment does not belong to this session.")
 
         if len(attachment.datas) < 50:
             raise ValueError("Attachment base64 too small.")
@@ -134,6 +141,13 @@ class PremaAISession(models.Model):
             if isinstance(attachment.datas, (bytes, bytearray))
             else attachment.datas
         )
+        if not isinstance(file_base64, str):
+            raise UserError("Attachment payload must be a base64 string.")
+        try:
+            base64.b64decode(file_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise UserError(f"Attachment base64 is invalid: {exc}")
+
         mimetype = attachment.mimetype or "application/pdf"
         data_url = f"data:{mimetype};base64,{file_base64}"
 
@@ -170,12 +184,18 @@ class PremaAISession(models.Model):
         except requests.RequestException as exc:
             raise UserError(f"OpenAI request failed: {exc}")
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise UserError(f"OpenAI response is not valid JSON: {exc}")
         text_output = ""
         for block in data.get("output", []):
             for item in block.get("content", []):
                 if item.get("type") == "output_text":
                     text_output += item.get("text", "")
+
+        if not text_output:
+            raise UserError("OpenAI returned no text output for document analysis.")
 
         parsed_data = None
         if text_output:
@@ -235,6 +255,8 @@ class PremaAISession(models.Model):
 
         session = self.browse(session_id)
         session.ensure_one()
+        if session.user_id != self.env.user:
+            raise UserError("You can only create draft bill suggestions in your own sessions.")
 
         parsed_data = kwargs.get("parsed_data")
         attachment_id = kwargs.get("attachment_id")
@@ -246,6 +268,9 @@ class PremaAISession(models.Model):
                 parsed_data = json.loads(parsed_data)
             except json.JSONDecodeError:
                 raise UserError("parsed_data must be valid JSON")
+
+        if not isinstance(parsed_data, dict):
+            raise UserError("parsed_data must be a JSON object")
 
         vendor_name = parsed_data.get("vendor_name") or "Unknown Vendor"
         partner = self.env["res.partner"].search([("name", "=ilike", vendor_name)], limit=1)
@@ -277,7 +302,13 @@ class PremaAISession(models.Model):
             "invoice_line_ids": [],
         }
 
-        for line in parsed_data.get("line_items", []):
+        line_items = parsed_data.get("line_items") or []
+        if not isinstance(line_items, list):
+            raise UserError("line_items must be an array")
+
+        for line in line_items:
+            if not isinstance(line, dict):
+                continue
             move_vals["invoice_line_ids"].append((0, 0, {
                 "name": line.get("description") or "AI extracted line",
                 "quantity": line.get("quantity", 1),
@@ -328,46 +359,49 @@ class PremaAISession(models.Model):
                 "content": msg.content,
             })
 
-        response = requests.post(
-            "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "gpt-4.1-mini",
-                "input": messages,
-                "tools": [
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "scan_chart_of_accounts",
-                            "description": "Scan Odoo chart of accounts for issues.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {},
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/responses",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gpt-4.1-mini",
+                    "input": messages,
+                    "tools": [
+                        {
+                            "type": "function",
+                            "function": {
+                                "name": "scan_chart_of_accounts",
+                                "description": "Scan Odoo chart of accounts for issues.",
+                                "parameters": {
+                                    "type": "object",
+                                    "properties": {},
+                                },
                             },
-                        },
-                    }
-                ],
-                "tool_choice": "auto",
-            },
-            timeout=60,
-        )
+                        }
+                    ],
+                    "tool_choice": "auto",
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as exc:
+            raise UserError(f"OpenAI chat request failed: {exc}")
+        except ValueError as exc:
+            raise UserError(f"OpenAI chat response is not valid JSON: {exc}")
 
-        if response.status_code != 200:
-            raise ValueError(response.text)
-
-        data = response.json()
         output = data.get("output", [])
         if not output:
-            raise ValueError("No output returned from OpenAI.")
+            raise UserError("No output returned from OpenAI.")
 
-        message_block = output[0]
-
-        # Tool call
-        if message_block.get("type") == "tool_call":
-            tool_name = message_block["name"]
+        tool_call = next((item for item in output if item.get("type") == "tool_call"), None)
+        if tool_call:
+            tool_name = tool_call.get("name")
+            if not tool_name:
+                raise UserError("OpenAI returned a tool call without a tool name.")
 
             tools = self._tool_registry()
             if tool_name not in tools:
@@ -396,11 +430,14 @@ class PremaAISession(models.Model):
                 "tool_log_id": log.id,
             }
 
-        # Normal response
         text_output = ""
-        for item in message_block.get("content", []):
-            if item.get("type") == "output_text":
-                text_output += item.get("text", "")
+        for block in output:
+            for item in block.get("content", []):
+                if item.get("type") == "output_text":
+                    text_output += item.get("text", "")
+
+        if not text_output:
+            text_output = "I could not generate a response."
 
         assistant_message = self.env["prema.ai.message"].create({
             "session_id": self.id,

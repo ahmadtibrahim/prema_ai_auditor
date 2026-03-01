@@ -8,7 +8,6 @@ import { session } from "@web/session";
 class AIConsole extends Component {
 
     setup() {
-        this.rpc = useService("rpc");
         this.notification = useService("notification");
         this.orm = useService("orm");
 
@@ -287,14 +286,14 @@ class AIConsole extends Component {
                 res_id: this.state.activeSessionId,
             }]);
 
-            const result = await this.rpc({
-                model: "prema.ai.session",
-                method: "analyze_uploaded_document",
-                args: [],
-                kwargs: {
+            const result = await this.orm.call(
+                "prema.ai.session",
+                "analyze_uploaded_document",
+                [],
+                {
                     attachment_id: attachmentId,
-                },
-            });
+                }
+            );
 
             const parsedDocument = typeof result.parsed_data === "string"
                 ? null

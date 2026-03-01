@@ -95,6 +95,7 @@ class AIConsole extends Component {
 
             await this.loadSessions();
             this.state.activeSessionId = sessionId;
+            await this.loadMessages();
         } catch (error) {
             console.error("Create session error:", error);
             this.notification.add("Failed to create session.", { type: "danger" });
@@ -274,7 +275,7 @@ class AIConsole extends Component {
             const result = await this.callKw(
                 "prema.ai.session",
                 "analyze_uploaded_document",
-                [],
+                [[this.state.activeSessionId]],
                 {
                     attachment_id: attachmentId,
                 }

@@ -99,10 +99,9 @@ class PremaAISession(models.Model):
     # DOCUMENT ANALYSIS (VISION)
     # =====================================================
 
-    @api.model
     def analyze_uploaded_document(self, attachment_id=None):
-        session_model = self.env["prema.ai.session"]
-        env = session_model.env
+        self.ensure_one()
+        env = self.env
 
         if not attachment_id:
             raise UserError("Attachment ID missing.")
@@ -111,12 +110,10 @@ class PremaAISession(models.Model):
         if not attachment.exists():
             raise UserError("Attachment not found.")
 
-        session = session_model.create({
-            "name": "Document Analysis",
-            "user_id": env.user.id,
-        })
+        if self.user_id != env.user:
+            raise UserError("You can only analyze documents in your own chat sessions.")
 
-        api_key = session.env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)
+        api_key = env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)
         if not api_key:
             from odoo.exceptions import UserError
             raise UserError(f"OpenAI API key is not configured in System Parameters ({OPENAI_API_KEY_PARAM})")
@@ -186,7 +183,7 @@ class PremaAISession(models.Model):
         document_vals = {
             "name": attachment.name,
             "attachment_id": attachment.id,
-            "session_id": session.id,
+            "session_id": self.id,
             "status": "analyzed",
             "ai_summary": text_output,
         }
@@ -202,20 +199,22 @@ class PremaAISession(models.Model):
                 "line_items": json.dumps(parsed_data.get("line_items", [])),
             })
 
-        session.env["prema.ai.document"].create(document_vals)
+        env["prema.ai.document"].create(document_vals)
 
-        session.env["prema.ai.tool.log"].create({
-            "user_id": session.env.user.id,
+        env["prema.ai.tool.log"].create({
+            "user_id": env.user.id,
             "tool_name": "analyze_document",
             "input_payload": json.dumps({"attachment_id": attachment_id}),
             "output_payload": text_output,
             "status": "executed",
-            "session_id": session.id,
+            "session_id": self.id,
         })
 
         return {
             "success": True,
-            "session_id": session.id,
+            "session_id": self.id,
+            "status": "analyzed",
+            "parsed_data": parsed_data,
         }
 
     @api.model
@@ -378,15 +377,15 @@ class PremaAISession(models.Model):
         if not output:
             raise UserError("No output returned from OpenAI.")
 
-        tool_call = next((item for item in output if item.get("type") == "tool_call"), None)
+        tool_call = next((item for item in output if item.get("type") in ("tool_call", "function_call")), None)
         if tool_call:
-            tool_name = tool_call.get("name")
+            tool_name = tool_call.get("name") or tool_call.get("function", {}).get("name")
             if not tool_name:
                 raise UserError("OpenAI returned a tool call without a tool name.")
 
             tools = self._tool_registry()
             if tool_name not in tools:
-                raise ValueError("Tool not registered.")
+                raise UserError(f"Tool not registered: {tool_name}")
 
             result = tools[tool_name]()
 
@@ -413,7 +412,11 @@ class PremaAISession(models.Model):
 
         text_output = ""
         for block in output:
-            for item in block.get("content", []):
+            content_items = block.get("content", [])
+            if block.get("type") == "message":
+                content_items = block.get("content", [])
+
+            for item in content_items:
                 if item.get("type") == "output_text":
                     text_output += item.get("text", "")
 

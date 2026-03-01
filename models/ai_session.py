@@ -1,7 +1,9 @@
-from odoo import api, models, fields
-from odoo.exceptions import UserError
-import requests
 import json
+
+import requests
+
+from odoo import fields, models
+from odoo.exceptions import UserError
 
 OPENAI_API_KEY_PARAM = "openai.api_key"
 
@@ -11,357 +13,176 @@ class PremaAISession(models.Model):
     _description = "Prema AI Session"
     _order = "create_date desc"
 
-    name = fields.Char(required=True)
-    user_id = fields.Many2one(
-        "res.users",
-        required=True,
-        default=lambda self: self.env.user,
-        ondelete="cascade",
-        index=True,
-    )
-    message_ids = fields.One2many(
-        "prema.ai.message",
-        "session_id",
-    )
+    name = fields.Char(default="AI Session")
+    user_id = fields.Many2one("res.users", default=lambda self: self.env.user)
+    message_ids = fields.One2many("prema.ai.message", "session_id")
 
-    # =====================================================
-    # TOOL REGISTRY
-    # =====================================================
-
-    def _tool_registry(self):
-        return {
-            "scan_chart_of_accounts": self._tool_scan_chart_of_accounts,
-        }
-
-    def _tool_scan_chart_of_accounts(self, payload=None):
-        accounts = self.env["account.account"].search([])
-        findings = []
-
-        for acc in accounts:
-            if not acc.code:
-                findings.append({
-                    "account_id": acc.id,
-                    "issue": "Missing account code",
-                })
-
-        return findings
-
-    # =====================================================
-    # CHAT MESSAGE ENTRYPOINT
-    # =====================================================
-
-    def action_rename_session(self, new_name):
+    def send_message(self, content):
         self.ensure_one()
 
         if self.user_id != self.env.user:
-            raise UserError("You can only rename your own chat sessions.")
+            raise UserError("You can only send messages in your own sessions.")
 
-        sanitized_name = (new_name or "").strip()
-        if not sanitized_name:
-            raise UserError("Session name cannot be empty.")
+        message_text = (content or "").strip()
+        if not message_text:
+            raise UserError("Message content cannot be empty.")
 
-        self.write({"name": sanitized_name})
-        return {"id": self.id, "name": sanitized_name}
-
-    def action_delete_session(self):
-        self.ensure_one()
-
-        if self.user_id != self.env.user:
-            raise UserError("You can only delete your own chat sessions.")
-
-        self.unlink()
-        return True
-
-    def send_user_message(self, content):
-        self.ensure_one()
-
-        if not content or not content.strip():
-            return {"error": "Empty message"}
-
-        user_message = self.env["prema.ai.message"].create({
-            "session_id": self.id,
-            "role": "user",
-            "content": content.strip(),
-        })
+        self.env["prema.ai.message"].create(
+            {
+                "session_id": self.id,
+                "role": "user",
+                "content": message_text,
+            }
+        )
 
         assistant_reply = self._call_openai()
 
+        self.env["prema.ai.message"].create(
+            {
+                "session_id": self.id,
+                "role": "assistant",
+                "content": assistant_reply,
+            }
+        )
+
+        return assistant_reply
+
+    def _tool_registry(self):
         return {
-            "user": {
-                "id": user_message.id,
-                "role": "user",
-                "content": user_message.content,
-            },
-            "assistant": assistant_reply,
+            "search_records": self._tool_search_records,
+            "create_record": self._tool_create_record,
+            "update_record": self._tool_update_record,
+            "delete_record": self._tool_delete_record,
+            "run_python": self._tool_run_python_safe,
+            "check_duplicate_bills": self._tool_check_duplicate_bills,
+            "financial_summary": self._tool_financial_summary,
+            "crm_pipeline_analysis": self._tool_crm_pipeline_analysis,
+            "revenue_forecast": self._tool_revenue_forecast,
         }
 
-    # =====================================================
-    # DOCUMENT ANALYSIS (VISION)
-    # =====================================================
+    def _tool_search_records(self, model, domain, fields):
+        return self.env[model].search_read(domain or [], fields or [])
 
-    def analyze_uploaded_document(self, attachment_id=None):
-        self.ensure_one()
-        env = self.env
+    def _tool_create_record(self, model, values, confirmed=False):
+        if not confirmed:
+            return "Confirmation required before creating records."
+        return self.env[model].create(values or {}).id
 
-        if not attachment_id:
-            raise UserError("Attachment ID missing.")
+    def _tool_update_record(self, model, record_id, values, confirmed=False):
+        if not confirmed:
+            return "Confirmation required before updating records."
+        self.env[model].browse(record_id).write(values or {})
+        return True
 
-        attachment = env["ir.attachment"].browse(attachment_id)
-        if not attachment.exists():
-            raise UserError("Attachment not found.")
+    def _tool_delete_record(self, model, record_id, confirmed=False):
+        if not confirmed:
+            return "Confirmation required before deleting records."
+        self.env[model].browse(record_id).unlink()
+        return True
 
-        if self.user_id != env.user:
-            raise UserError("You can only analyze documents in your own chat sessions.")
+    def _tool_run_python_safe(self, code=None, confirmed=False):
+        if not confirmed:
+            return "Confirmation required before running server-side Python."
+        raise UserError("run_python is disabled in production-safe mode.")
 
-        api_key = env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)
-        if not api_key:
-            from odoo.exceptions import UserError
-            raise UserError(f"OpenAI API key is not configured in System Parameters ({OPENAI_API_KEY_PARAM})")
+    def _tool_check_duplicate_bills(self):
+        grouped = self.env["account.move"].read_group(
+            [("move_type", "=", "in_invoice"), ("state", "!=", "cancel")],
+            ["ref", "partner_id", "id:count"],
+            ["ref", "partner_id"],
+            lazy=False,
+        )
+        duplicates = []
+        for row in grouped:
+            if row.get("id_count", 0) > 1 and row.get("ref") and row.get("partner_id"):
+                duplicates.append(
+                    {
+                        "partner_id": row["partner_id"][0],
+                        "partner_name": row["partner_id"][1],
+                        "reference": row["ref"],
+                        "count": row["id_count"],
+                    }
+                )
+        return duplicates
 
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-
-        if not attachment.datas:
-            raise UserError("Empty file.")
-
-        if isinstance(attachment.datas, bytes):
-            base64_string = attachment.datas.decode("utf-8")
-        else:
-            base64_string = attachment.datas
-
-        mimetype = attachment.mimetype or "application/octet-stream"
-        file_data = f"data:{mimetype};base64,{base64_string}"
-
-        payload = {
-            "model": "gpt-4.1-mini",
-            "input": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_file", "file_data": file_data},
-                        {"type": "input_text", "text": "Extract structured invoice data as JSON only."},
-                    ],
-                }
-            ],
-        }
-
-        try:
-            response = requests.post(
-                "https://api.openai.com/v1/responses",
-                headers=headers,
-                json=payload,
-                timeout=60,
-            )
-        except requests.RequestException as exc:
-            raise UserError(f"OpenAI request failed: {exc}")
-
-        if response.status_code != 200:
-            raise UserError(response.text)
-
-        try:
-            data = response.json()
-        except ValueError as exc:
-            raise UserError(f"OpenAI response is not valid JSON: {exc}")
-        text_output = ""
-        for block in data.get("output", []):
-            for item in block.get("content", []):
-                if item.get("type") == "output_text":
-                    text_output += item.get("text", "")
-
-        if not text_output:
-            raise UserError("AI returned empty result.")
-
-        parsed_data = None
-        if text_output:
-            try:
-                parsed_data = json.loads(text_output)
-            except json.JSONDecodeError:
-                parsed_data = None
-
-        document_vals = {
-            "name": attachment.name,
-            "attachment_id": attachment.id,
-            "session_id": self.id,
-            "status": "analyzed",
-            "ai_summary": text_output,
-        }
-
-        if parsed_data:
-            document_vals.update({
-                "vendor_name": parsed_data.get("vendor_name"),
-                "invoice_number": parsed_data.get("invoice_number"),
-                "invoice_date": parsed_data.get("invoice_date"),
-                "subtotal": parsed_data.get("subtotal"),
-                "tax": parsed_data.get("tax"),
-                "total": parsed_data.get("total"),
-                "line_items": json.dumps(parsed_data.get("line_items", [])),
-            })
-
-        env["prema.ai.document"].create(document_vals)
-
-        env["prema.ai.tool.log"].create({
-            "user_id": env.user.id,
-            "tool_name": "analyze_document",
-            "input_payload": json.dumps({"attachment_id": attachment_id}),
-            "output_payload": text_output,
-            "status": "executed",
-            "session_id": self.id,
-        })
-
+    def _tool_financial_summary(self):
+        moves = self.env["account.move"].search([
+            ("state", "=", "posted"),
+            ("move_type", "in", ["out_invoice", "out_refund", "in_invoice", "in_refund"]),
+        ])
+        revenue = sum(moves.filtered(lambda m: m.move_type in ("out_invoice", "out_refund")).mapped("amount_total_signed"))
+        expense = -sum(moves.filtered(lambda m: m.move_type in ("in_invoice", "in_refund")).mapped("amount_total_signed"))
         return {
-            "success": True,
-            "session_id": self.id,
-            "status": "analyzed",
-            "parsed_data": parsed_data,
+            "posted_moves": len(moves),
+            "revenue": revenue,
+            "expense": expense,
+            "net": revenue - expense,
         }
 
-    @api.model
-    def create_draft_bill_from_ai(self, *args, **kwargs):
-        session_id = False
-        if args:
-            first_arg = args[0]
-            if isinstance(first_arg, int):
-                session_id = first_arg
-            elif isinstance(first_arg, (list, tuple)) and first_arg:
-                session_id = first_arg[0]
+    def _tool_crm_pipeline_analysis(self):
+        leads = self.env["crm.lead"].search([])
+        stage_breakdown = {}
+        for lead in leads:
+            stage = lead.stage_id.name or "Undefined"
+            stage_breakdown.setdefault(stage, {"count": 0, "expected_revenue": 0.0})
+            stage_breakdown[stage]["count"] += 1
+            stage_breakdown[stage]["expected_revenue"] += lead.expected_revenue or 0.0
+        return stage_breakdown
 
-        if not session_id:
-            raise UserError("Session context missing.")
-
-        session = self.browse(session_id)
-        session.ensure_one()
-        if session.user_id != self.env.user:
-            raise UserError("You can only create draft bill suggestions in your own sessions.")
-
-        parsed_data = kwargs.get("parsed_data")
-        attachment_id = kwargs.get("attachment_id")
-        if not parsed_data or not attachment_id:
-            raise UserError("parsed_data and attachment_id are required")
-
-        if isinstance(parsed_data, str):
-            try:
-                parsed_data = json.loads(parsed_data)
-            except json.JSONDecodeError:
-                raise UserError("parsed_data must be valid JSON")
-
-        if not isinstance(parsed_data, dict):
-            raise UserError("parsed_data must be a JSON object")
-
-        vendor_name = parsed_data.get("vendor_name") or "Unknown Vendor"
-        partner = self.env["res.partner"].search([("name", "=ilike", vendor_name)], limit=1)
-        if not partner:
-            partner = self.env["res.partner"].create({"name": vendor_name})
-
-        invoice_number = parsed_data.get("invoice_number")
-        invoice_date = parsed_data.get("invoice_date")
-        existing = self.env["account.move"].search([
-            ("move_type", "=", "in_invoice"),
-            ("partner_id", "=", partner.id),
-            ("invoice_date", "=", invoice_date),
-            ("ref", "=", invoice_number),
-        ], limit=1)
-        if existing:
-            raise UserError("A bill with this vendor and invoice number already exists.")
-
-        expense_account = self.env["account.account"].search([
-            ("account_type", "=", "expense"),
-        ], limit=1)
-        if not expense_account:
-            raise UserError("No expense account found to build draft bill suggestion.")
-
-        move_vals = {
-            "move_type": "in_invoice",
-            "partner_id": partner.id,
-            "invoice_date": invoice_date,
-            "ref": invoice_number,
-            "invoice_line_ids": [],
-        }
-
-        line_items = parsed_data.get("line_items") or []
-        if not isinstance(line_items, list):
-            raise UserError("line_items must be an array")
-
-        for line in line_items:
-            if not isinstance(line, dict):
-                continue
-            move_vals["invoice_line_ids"].append((0, 0, {
-                "name": line.get("description") or "AI extracted line",
-                "quantity": line.get("quantity", 1),
-                "price_unit": line.get("unit_price", 0.0),
-                "account_id": expense_account.id,
-            }))
-
-        tool_log = self.env["prema.ai.tool.log"].create({
-            "user_id": self.env.user.id,
-            "session_id": session.id,
-            "tool_name": "create_draft_bill_from_ai",
-            "input_payload": json.dumps({"parsed_data": parsed_data, "attachment_id": attachment_id}),
-            "output_payload": json.dumps(move_vals),
-            "status": "suggested",
-        })
-
-        self.env["prema.ai.document"].search([
-            ("session_id", "=", session.id),
-            ("attachment_id", "=", attachment_id),
-        ], limit=1).write({"status": "draft_created"})
-
+    def _tool_revenue_forecast(self):
+        leads = self.env["crm.lead"].search([("type", "=", "opportunity")])
+        weighted = sum((lead.expected_revenue or 0.0) * ((lead.probability or 0.0) / 100.0) for lead in leads)
         return {
-            "bill_name": invoice_number,
-            "tool_log_id": tool_log.id,
+            "opportunity_count": len(leads),
+            "weighted_forecast": weighted,
         }
-
-    # =====================================================
-    # OPENAI CHAT CALL
-    # =====================================================
 
     def _call_openai(self):
         self.ensure_one()
 
         api_key = self.env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)
         if not api_key:
-            from odoo.exceptions import UserError
             raise UserError(f"OpenAI API key is not configured in System Parameters ({OPENAI_API_KEY_PARAM})")
 
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are connected to a live Odoo 18 ERP. "
+                    "You may request tools:\n"
+                    "- search_records\n"
+                    "- create_record\n"
+                    "- update_record\n"
+                    "- delete_record\n"
+                    "Always ask confirmation before destructive actions."
+                ),
+            }
+        ]
+        for msg in self.message_ids.sorted("create_date")[-20:]:
+            messages.append({"role": msg.role, "content": msg.content})
 
-        history = self.message_ids.sorted("create_date")[-20:]
-
-        messages = [{
-            "role": "system",
-            "content": "You are Prema AI running inside Odoo 18 Enterprise. Operate strictly through ORM.",
-        }]
-
-        for msg in history:
-            messages.append({
-                "role": msg.role,
-                "content": msg.content,
-            })
+        tool_specs = []
+        for name in self._tool_registry().keys():
+            tool_specs.append(
+                {
+                    "type": "function",
+                    "name": name,
+                    "description": f"Execute {name} on Odoo ORM.",
+                    "parameters": {"type": "object", "additionalProperties": True},
+                }
+            )
 
         try:
             response = requests.post(
                 "https://api.openai.com/v1/responses",
-                headers=headers,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
                 json={
                     "model": "gpt-4.1-mini",
                     "input": messages,
-                    "tools": [
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": "scan_chart_of_accounts",
-                                "description": "Scan Odoo chart of accounts for issues.",
-                                "parameters": {
-                                    "type": "object",
-                                    "properties": {},
-                                },
-                            },
-                        }
-                    ],
+                    "tools": tool_specs,
                     "tool_choice": "auto",
                 },
                 timeout=60,
@@ -374,63 +195,44 @@ class PremaAISession(models.Model):
             raise UserError(f"OpenAI chat response is not valid JSON: {exc}")
 
         output = data.get("output", [])
-        if not output:
-            raise UserError("No output returned from OpenAI.")
-
-        tool_call = next((item for item in output if item.get("type") in ("tool_call", "function_call")), None)
-        if tool_call:
-            tool_name = tool_call.get("name") or tool_call.get("function", {}).get("name")
-            if not tool_name:
-                raise UserError("OpenAI returned a tool call without a tool name.")
-
+        tool_calls = [item for item in output if item.get("type") == "function_call"]
+        if tool_calls:
             tools = self._tool_registry()
-            if tool_name not in tools:
-                raise UserError(f"Tool not registered: {tool_name}")
+            tool_result_messages = []
+            for call in tool_calls:
+                tool_name = call.get("name")
+                if tool_name not in tools:
+                    raise UserError(f"Tool not registered: {tool_name}")
+                arguments = call.get("arguments") or "{}"
+                params = json.loads(arguments) if isinstance(arguments, str) else (arguments or {})
+                result = tools[tool_name](**params)
+                tool_result_messages.append({
+                    "type": "function_call_output",
+                    "call_id": call.get("call_id"),
+                    "output": json.dumps(result),
+                })
 
-            result = tools[tool_name]()
-
-            log = self.env["prema.ai.tool.log"].create({
-                "user_id": self.env.user.id,
-                "tool_name": tool_name,
-                "input_payload": json.dumps({}),
-                "output_payload": json.dumps(result),
-                "status": "suggested",
-            })
-
-            assistant_message = self.env["prema.ai.message"].create({
-                "session_id": self.id,
-                "role": "assistant",
-                "content": f"Tool '{tool_name}' executed. {len(result)} findings stored for approval.",
-            })
-
-            return {
-                "id": assistant_message.id,
-                "role": "assistant",
-                "content": assistant_message.content,
-                "tool_log_id": log.id,
-            }
+            followup = requests.post(
+                "https://api.openai.com/v1/responses",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gpt-4.1-mini",
+                    "input": tool_result_messages,
+                    "previous_response_id": data.get("id"),
+                },
+                timeout=60,
+            )
+            followup.raise_for_status()
+            data = followup.json()
+            output = data.get("output", [])
 
         text_output = ""
         for block in output:
-            content_items = block.get("content", [])
-            if block.get("type") == "message":
-                content_items = block.get("content", [])
-
-            for item in content_items:
+            for item in block.get("content", []):
                 if item.get("type") == "output_text":
                     text_output += item.get("text", "")
 
-        if not text_output:
-            text_output = "I could not generate a response."
-
-        assistant_message = self.env["prema.ai.message"].create({
-            "session_id": self.id,
-            "role": "assistant",
-            "content": text_output,
-        })
-
-        return {
-            "id": assistant_message.id,
-            "role": "assistant",
-            "content": assistant_message.content,
-        }
+        return text_output or "I could not generate a response."

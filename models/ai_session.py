@@ -1,4 +1,4 @@
-from odoo import models, fields
+from odoo import api, models, fields
 import requests
 import json
 
@@ -74,8 +74,16 @@ class PremaAISession(models.Model):
     # DOCUMENT ANALYSIS (VISION)
     # =====================================================
 
-    def analyze_uploaded_document(self, attachment_id):
-        self.ensure_one()
+    @api.model
+    def analyze_uploaded_document(self, *args, **kwargs):
+        session_ids = args[0] if args else []
+        attachment_id = kwargs.get("attachment_id")
+
+        if not session_ids:
+            raise ValueError("Session context missing.")
+
+        session = self.browse(session_ids[0])
+        session.ensure_one()
 
         if not attachment_id:
             raise ValueError("attachment_id is required.")
@@ -85,40 +93,42 @@ class PremaAISession(models.Model):
             raise ValueError("OpenAI API key not configured.")
 
         attachment = self.env["ir.attachment"].browse(attachment_id)
-        if not attachment:
-            raise ValueError("Attachment not found.")
+        if not attachment or not attachment.datas:
+            raise ValueError("Attachment not found or empty.")
 
-        file_base64 = attachment.datas
-        if not file_base64:
-            raise ValueError("Attachment has no data.")
-        if isinstance(file_base64, bytes):
-            file_base64 = file_base64.decode()
+        file_base64 = attachment.datas.decode() if isinstance(attachment.datas, bytes) else attachment.datas
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": "gpt-4.1-mini",
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": "Extract structured invoice data as JSON. Return only valid JSON.",
+                        },
+                        {
+                            "type": "input_file",
+                            "file_data": file_base64,
+                            "filename": attachment.name,
+                            "mime_type": attachment.mimetype or "application/pdf",
+                        },
+                    ],
+                }
+            ],
+        }
 
         response = requests.post(
             "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "gpt-4.1-mini",
-                "input": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "input_text",
-                                "text": "Extract structured invoice data as JSON. Return only valid JSON."
-                            },
-                            {
-                                "type": "input_image",
-                                "image_base64": file_base64
-                            }
-                        ],
-                    }
-                ],
-            },
-            timeout=60,
+            headers=headers,
+            json=payload,
+            timeout=90,
         )
 
         if response.status_code != 200:
@@ -126,33 +136,33 @@ class PremaAISession(models.Model):
 
         data = response.json()
 
-        output_text = ""
-        if data.get("output"):
-            for item in data["output"][0].get("content", []):
+        text_output = ""
+        for block in data.get("output", []):
+            for item in block.get("content", []):
                 if item.get("type") == "output_text":
-                    output_text += item.get("text", "")
+                    text_output += item.get("text", "")
 
         document = self.env["prema.ai.document"].create({
             "name": attachment.name,
-            "session_id": self.id,
             "attachment_id": attachment.id,
-            "ai_summary": output_text,
+            "ai_summary": text_output,
             "status": "analyzed",
+            "session_id": session.id,
         })
 
         self.env["prema.ai.tool.log"].create({
             "user_id": self.env.user.id,
-            "session_id": self.id,
             "tool_name": "analyze_document",
             "input_payload": json.dumps({"attachment_id": attachment_id}),
-            "output_payload": output_text,
+            "output_payload": text_output,
             "status": "executed",
+            "session_id": session.id,
         })
 
         return {
             "document_id": document.id,
-            "parsed_data": output_text,
-            "status": document.status,
+            "parsed_data": text_output,
+            "status": "analyzed",
         }
 
     # =====================================================

@@ -2,7 +2,7 @@
     <!-- Client Action for AI Console -->
     <record id="action_prema_ai_console" model="ir.actions.client">
         <field name="name">Prema AI Console</field>
-        <field name="tag">prema_ai_console.main</field>
+        <field name="tag">prema_ai_console</field>
     </record>
 
     <!-- Menu items -->

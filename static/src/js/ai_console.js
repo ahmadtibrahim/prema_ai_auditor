@@ -8,9 +8,9 @@ import { session } from "@web/session";
 class AIConsole extends Component {
 
     setup() {
-        this.orm = useService("orm");
         this.rpc = useService("rpc");
         this.notification = useService("notification");
+        this.orm = useService("orm");
 
         this.state = useState({
             sessions: [],
@@ -338,3 +338,4 @@ class AIConsole extends Component {
 
 AIConsole.template = "prema_ai_auditor.AIConsole";
 registry.category("actions").add("prema_ai_console.main", AIConsole);
+registry.category("actions").add("prema_ai_console", AIConsole);

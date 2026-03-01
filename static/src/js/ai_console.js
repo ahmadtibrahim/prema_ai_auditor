@@ -9,7 +9,6 @@ class AIConsole extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
-        this.user = useService("user");
 
         this.state = useState({
             sessions: [],
@@ -92,7 +91,7 @@ class AIConsole extends Component {
                 "prema.ai.session",
                 [{
                     name: "New Chat",
-                    user_id: this.user.userId,
+                    user_id: this.env.session.uid,
                 }]
             );
 

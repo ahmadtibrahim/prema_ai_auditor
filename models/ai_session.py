@@ -17,6 +17,23 @@ class PremaAISession(models.Model):
     user_id = fields.Many2one("res.users", default=lambda self: self.env.user)
     message_ids = fields.One2many("prema.ai.message", "session_id")
 
+    def list_sessions(self):
+        sessions = self.search(
+            [("user_id", "=", self.env.user.id)],
+            order="create_date desc",
+        )
+        return sessions.read(["id", "name"])
+
+    def rename_session(self, new_name):
+        self.ensure_one()
+        self.name = new_name
+        return True
+
+    def delete_session(self):
+        self.ensure_one()
+        self.unlink()
+        return True
+
     def send_message(self, message):
         self.ensure_one()
 

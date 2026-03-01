@@ -1,67 +1,99 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
 class AIConsole extends Component {
     setup() {
         this.orm = useService("orm");
-        this.notification = useService("notification");
 
         this.state = useState({
+            sessions: [],
             activeSessionId: null,
             messages: [],
             input: "",
         });
 
-        onWillStart(async () => {
-            await this._ensureSession();
-            await this._loadMessages();
-        });
+        this.loadSessions();
     }
 
-    async _ensureSession() {
-        const sessions = await this.orm.searchRead("prema.ai.session", [], ["id"], { limit: 1, order: "id desc" });
-        if (sessions.length) {
-            this.state.activeSessionId = sessions[0].id;
-            return;
-        }
-        this.state.activeSessionId = await this.orm.create("prema.ai.session", [{ name: "AI Session" }]);
-    }
-
-    async _loadMessages() {
-        if (!this.state.activeSessionId) {
-            return;
-        }
-        this.state.messages = await this.orm.searchRead(
-            "prema.ai.message",
-            [["session_id", "=", this.state.activeSessionId]],
-            ["role", "content"],
-            { order: "id asc" }
+    async loadSessions() {
+        this.state.sessions = await this.orm.call(
+            "prema.ai.session",
+            "list_sessions",
+            []
         );
     }
 
-    async sendMessage() {
-        const messageText = (this.state.input || "").trim();
-        if (!messageText || !this.state.activeSessionId) {
+    async createNewSession() {
+        const id = await this.orm.call(
+            "prema.ai.session",
+            "create",
+            [{ name: "New Chat" }]
+        );
+        await this.loadSessions();
+        this.selectSession(id);
+    }
+
+    async selectSession(id) {
+        this.state.activeSessionId = id;
+        this.state.messages = await this.orm.call(
+            "prema.ai.message",
+            "search_read",
+            [[["session_id", "=", id]], ["role", "content"]]
+        );
+    }
+
+    async renameSession(id) {
+        const newName = prompt("Rename chat:");
+        if (!newName) {
             return;
         }
 
-        try {
-            this.sessionId = this.state.activeSessionId;
-            const message = messageText;
-            const reply = await this.orm.call(
-                "prema.ai.session",
-                "send_message",
-                [this.sessionId, message]
-            );
-            this.state.messages.push({ role: "user", content: messageText });
-            this.state.messages.push({ role: "assistant", content: reply });
-            this.state.input = "";
-        } catch (error) {
-            console.error(error);
-            this.notification.add("Failed to send message", { type: "danger" });
+        await this.orm.call(
+            "prema.ai.session",
+            "rename_session",
+            [id, newName]
+        );
+        await this.loadSessions();
+    }
+
+    async deleteSession(id) {
+        if (!confirm("Delete this chat?")) {
+            return;
+        }
+
+        await this.orm.call(
+            "prema.ai.session",
+            "delete_session",
+            [id]
+        );
+
+        await this.loadSessions();
+        this.state.activeSessionId = null;
+        this.state.messages = [];
+    }
+
+    async sendMessage() {
+        if (!this.state.input || !this.state.activeSessionId) {
+            return;
+        }
+
+        await this.orm.call(
+            "prema.ai.session",
+            "send_message",
+            [this.state.activeSessionId, this.state.input]
+        );
+
+        this.state.input = "";
+        await this.selectSession(this.state.activeSessionId);
+    }
+
+    handleKeyDown(ev) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            this.sendMessage();
         }
     }
 }

@@ -101,16 +101,19 @@ class PremaAISession(models.Model):
 
     @api.model
     def analyze_uploaded_document(self, attachment_id=None):
+        session_model = self.env["prema.ai.session"]
+        env = session_model.env
+
         if not attachment_id:
             raise UserError("Attachment ID missing.")
 
-        attachment = self.env["ir.attachment"].browse(attachment_id)
+        attachment = env["ir.attachment"].browse(attachment_id)
         if not attachment.exists():
             raise UserError("Attachment not found.")
 
-        session = self.create({
+        session = session_model.create({
             "name": "Document Analysis",
-            "user_id": self.env.user.id,
+            "user_id": env.user.id,
         })
 
         api_key = session.env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)

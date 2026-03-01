@@ -1,10 +1,11 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, useState, onWillStart } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
 class AIConsole extends Component {
+
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
@@ -18,99 +19,131 @@ class AIConsole extends Component {
 
         onWillStart(async () => {
             await this.loadSessions();
-            if (this.state.activeSessionId) {
-                await this.loadMessages();
-            }
         });
     }
 
+    // ----------------------------
+    // LOAD SESSIONS
+    // ----------------------------
+
     async loadSessions() {
-        const sessions = await this.orm.searchRead("prema.ai.session", [], ["name"]);
+        const sessions = await this.orm.searchRead(
+            "prema.ai.session",
+            [],
+            ["name"]
+        );
+
         this.state.sessions = sessions;
-        if (!this.state.activeSessionId && sessions.length) {
+
+        if (sessions.length && !this.state.activeSessionId) {
             this.state.activeSessionId = sessions[0].id;
+            await this.loadMessages();
         }
     }
 
     async loadMessages() {
-        if (!this.state.activeSessionId) {
-            this.state.messages = [];
-            return;
-        }
+        if (!this.state.activeSessionId) return;
+
         const messages = await this.orm.searchRead(
             "prema.ai.message",
             [["session_id", "=", this.state.activeSessionId]],
-            ["id", "role", "content"]
+            ["role", "content"]
         );
+
         this.state.messages = messages;
     }
 
     async selectSession(id) {
-        if (this.state.activeSessionId === id) {
-            return;
-        }
         this.state.activeSessionId = id;
         await this.loadMessages();
     }
 
+    // ----------------------------
+    // CREATE SESSION
+    // ----------------------------
+
     async createNewSession() {
+        const id = await this.orm.create("prema.ai.session", [{
+            name: "New Chat"
+        }]);
+
+        await this.loadSessions();
+        this.state.activeSessionId = id;
+        await this.loadMessages();
+    }
+
+    // ----------------------------
+    // RENAME SESSION (FIXED CONTEXT)
+    // ----------------------------
+
+    async renameSession(session) {
         try {
-            const newId = await this.orm.create("prema.ai.session", [{ name: "New Chat" }]);
-            this.state.activeSessionId = newId[0];
+            if (!session.name || !session.name.trim()) {
+                this.notification.add("Session name cannot be empty", {
+                    type: "warning",
+                });
+                return;
+            }
+
+            await this.orm.write(
+                "prema.ai.session",
+                [session.id],
+                { name: session.name }
+            );
+
+            this.notification.add("Session renamed", {
+                type: "success",
+            });
+
             await this.loadSessions();
-            await this.loadMessages();
+
         } catch (error) {
-            this.notification.add("Failed to create session", { type: "danger" });
+            console.error("Rename error:", error);
         }
     }
+
+    // ----------------------------
+    // DELETE SESSION
+    // ----------------------------
 
     async deleteSession(id) {
         try {
             await this.orm.unlink("prema.ai.session", [id]);
+
             if (this.state.activeSessionId === id) {
                 this.state.activeSessionId = null;
-            }
-            await this.loadSessions();
-            if (this.state.sessions.length) {
-                this.state.activeSessionId = this.state.sessions[0].id;
-                await this.loadMessages();
-            } else {
                 this.state.messages = [];
             }
+
+            await this.loadSessions();
+
+            this.notification.add("Session deleted", {
+                type: "info",
+            });
+
         } catch (error) {
-            this.notification.add("Failed to delete session", { type: "danger" });
+            console.error("Delete error:", error);
         }
     }
 
-    async renameSession(id, newName) {
-        try {
-            const name = (newName || "").trim();
-            if (!name) {
-                return;
-            }
-            await this.orm.write("prema.ai.session", [id], { name: name });
-            await this.loadSessions();
-        } catch (error) {
-            this.notification.add("Failed to rename session", { type: "danger" });
-        }
-    }
+    // ----------------------------
+    // SEND MESSAGE
+    // ----------------------------
 
     async sendMessage() {
-        const content = (this.state.input || "").trim();
-        if (!content) {
-            return;
-        }
-        try {
-            if (!this.state.activeSessionId) {
-                await this.createNewSession();
-            }
-            const result = await this.orm.call("prema.ai.session", "send_user_message", [], { content: content });
-            this.state.messages.push(result.user);
-            this.state.messages.push(result.assistant);
-            this.state.input = "";
-        } catch (error) {
-            this.notification.add("Failed to send message", { type: "danger" });
-        }
+        if (!this.state.input.trim() || !this.state.activeSessionId) return;
+
+        const result = await this.orm.call(
+            "prema.ai.session",
+            "send_user_message",
+            [this.state.activeSessionId],
+            { content: this.state.input }
+        );
+
+        this.state.messages.push(result.user);
+        this.state.messages.push(result.assistant);
+
+        this.state.input = "";
     }
 }
 

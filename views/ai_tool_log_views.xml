@@ -1,10 +1,11 @@
 <odoo>
+
     <!-- LIST VIEW -->
-    <record id="view_ai_tool_log_tree" model="ir.ui.view">
-        <field name="name">prema.ai.tool.log.tree</field>
+    <record id="view_prema_ai_tool_log_list" model="ir.ui.view">
+        <field name="name">prema.ai.tool.log.list</field>
         <field name="model">prema.ai.tool.log</field>
         <field name="arch" type="xml">
-            <list string="AI Tool Logs">
+            <list>
                 <field name="create_date"/>
                 <field name="user_id"/>
                 <field name="tool_name"/>
@@ -14,23 +15,23 @@
     </record>
 
     <!-- FORM VIEW -->
-    <record id="view_ai_tool_log_form" model="ir.ui.view">
+    <record id="view_prema_ai_tool_log_form" model="ir.ui.view">
         <field name="name">prema.ai.tool.log.form</field>
         <field name="model">prema.ai.tool.log</field>
         <field name="arch" type="xml">
-            <form string="AI Tool Log">
-                <header>
-                    <button name="action_approve" type="object" string="Approve" class="btn-primary"/>
-                    <button name="action_execute" type="object" string="Execute" class="btn-success"/>
-                    <button name="action_delete_log" type="object" string="Delete" class="btn-danger"/>
-                </header>
+            <form>
                 <sheet>
                     <group>
-                        <field name="user_id"/>
-                        <field name="tool_name"/>
+                        <field name="create_date" readonly="1"/>
+                        <field name="user_id" readonly="1"/>
+                        <field name="tool_name" readonly="1"/>
                         <field name="status"/>
-                        <field name="input_payload"/>
-                        <field name="output_payload"/>
+                    </group>
+                    <group string="Input">
+                        <field name="input_payload" widget="text"/>
+                    </group>
+                    <group string="Output">
+                        <field name="output_payload" widget="text"/>
                     </group>
                 </sheet>
             </form>
@@ -38,9 +39,17 @@
     </record>
 
     <!-- ACTION -->
-    <record id="action_ai_tool_logs" model="ir.actions.act_window">
+    <record id="action_prema_ai_tool_log" model="ir.actions.act_window">
         <field name="name">AI Tool Logs</field>
         <field name="res_model">prema.ai.tool.log</field>
         <field name="view_mode">list,form</field>
     </record>
+
+    <!-- MENU -->
+    <menuitem id="menu_prema_ai_tool_log"
+              name="AI Tool Logs"
+              parent="menu_prema_ai_root"
+              action="action_prema_ai_tool_log"
+              sequence="20"/>
+
 </odoo>

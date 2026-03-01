@@ -1,53 +1,78 @@
 <templates xml:space="preserve">
+
     <t t-name="prema_ai_auditor.AIConsole">
         <div class="o_ai_layout">
+
             <!-- LEFT SIDEBAR -->
             <div class="o_ai_sidebar">
+
                 <div class="o_ai_sidebar_header">
-                    <button t-on-click="createNewSession" class="btn btn-primary w-100">
+                    <button t-on-click="createNewSession"
+                            class="btn btn-primary w-100">
                         + New Chat
                     </button>
                 </div>
+
                 <div class="o_ai_sessions">
-                    <t t-foreach="state.sessions" t-as="sess" t-key="sess.id">
+                    <t t-foreach="state.sessions"
+                       t-as="sess"
+                       t-key="sess.id">
+
                         <div class="o_ai_session_item"
-                             t-att-class="{'active': sess.id === state.activeSessionId}"
-                             t-on-click="() => selectSession(sess.id)">
+                             t-att-class="{'active': sess.id === state.activeSessionId}">
+
+                            <!-- Editable session name -->
                             <input type="text"
-                                   class="form-control flex-grow-1"
-                                   t-att-value="sess.name"
+                                   t-model="sess.name"
+                                   t-on-blur="() => renameSession(sess)"
                                    t-on-click.stop=""
-                                   t-on-blur="(ev) => renameSession(sess.id, ev.target.value)"
-                                   t-on-keydown="(ev) => ev.key === 'Enter' &amp;&amp; renameSession(sess.id, ev.target.value)"/>
-                            <i class="fa fa-trash ms-2"
-                               style="cursor:pointer"
-                               t-on-click.stop="() => deleteSession(sess.id)"></i>
+                                   class="o_ai_session_name"/>
+
+                            <!-- Delete icon -->
+                            <i class="fa fa-trash o_ai_delete_icon"
+                               t-on-click.stop="() => deleteSession(sess.id)"/>
+
+                            <!-- Click area to select -->
+                            <div class="o_ai_select_overlay"
+                                 t-on-click="() => selectSession(sess.id)"/>
                         </div>
+
                     </t>
                 </div>
+
             </div>
 
             <!-- RIGHT CHAT AREA -->
             <div class="o_ai_chat_area">
+
                 <div class="o_ai_messages">
-                    <t t-foreach="state.messages" t-as="msg" t-key="msg.id">
+                    <t t-foreach="state.messages"
+                       t-as="msg"
+                       t-key="msg.id">
+
                         <div t-att-class="'o_ai_msg ' + msg.role">
                             <div class="o_ai_msg_content">
                                 <t t-esc="msg.content"/>
                             </div>
                         </div>
+
                     </t>
                 </div>
+
                 <div class="o_ai_input_bar">
                     <input type="text"
-                           class="form-control flex-grow-1"
                            t-model="state.input"
                            placeholder="Type your message..."/>
-                    <button t-on-click="sendMessage" class="btn btn-primary">
+
+                    <button t-on-click="sendMessage"
+                            class="btn btn-primary">
                         Send
                     </button>
                 </div>
+
             </div>
+
         </div>
     </t>
+
 </templates>

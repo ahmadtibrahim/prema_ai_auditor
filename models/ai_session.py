@@ -98,30 +98,16 @@ class PremaAISession(models.Model):
     # =====================================================
 
     @api.model
-    def analyze_uploaded_document(self, *args, **kwargs):
-        self.ensure_one()
-        session_id = False
-        if args:
-            first_arg = args[0]
-            if isinstance(first_arg, int):
-                session_id = first_arg
-            elif isinstance(first_arg, (list, tuple)) and first_arg:
-                session_id = first_arg[0]
-
-        attachment_id = kwargs.get("attachment_id")
-
-        if not session_id:
-            raise UserError("Session context missing.")
-
-        session = self.browse(session_id)
-        session.ensure_one()
-        if session.user_id != self.env.user:
-            raise UserError("You can only analyze documents in your own sessions.")
-
+    def analyze_uploaded_document(self, attachment_id=None):
         if not attachment_id:
-            raise UserError("attachment_id is required.")
+            raise UserError("Attachment ID missing.")
 
-        api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
+        session = self.create({
+            "name": "Document Analysis Session",
+            "user_id": self.env.user.id,
+        })
+
+        api_key = session.env["ir.config_parameter"].sudo().get_param("openai.api_key")
         if not api_key:
             from odoo.exceptions import UserError
             raise UserError("OpenAI API key is not configured in System Parameters (openai.api_key)")
@@ -131,15 +117,12 @@ class PremaAISession(models.Model):
             "Content-Type": "application/json",
         }
 
-        attachment = self.env["ir.attachment"].browse(attachment_id)
+        attachment = session.env["ir.attachment"].browse(attachment_id)
         if not attachment:
             raise UserError("No document uploaded.")
 
         if not attachment.datas:
             raise UserError("Empty file.")
-
-        if attachment.res_model != "prema.ai.session" or attachment.res_id != session.id:
-            raise UserError("Attachment does not belong to this session.")
 
         if isinstance(attachment.datas, bytes):
             base64_string = attachment.datas.decode("utf-8")
@@ -214,10 +197,10 @@ class PremaAISession(models.Model):
                 "line_items": json.dumps(parsed_data.get("line_items", [])),
             })
 
-        document = self.env["prema.ai.document"].create(document_vals)
+        session.env["prema.ai.document"].create(document_vals)
 
-        self.env["prema.ai.tool.log"].create({
-            "user_id": self.env.user.id,
+        session.env["prema.ai.tool.log"].create({
+            "user_id": session.env.user.id,
             "tool_name": "analyze_document",
             "input_payload": json.dumps({"attachment_id": attachment_id}),
             "output_payload": text_output,
@@ -226,9 +209,8 @@ class PremaAISession(models.Model):
         })
 
         return {
-            "document_id": document.id,
-            "parsed_data": parsed_data or text_output,
-            "status": document.status,
+            "success": True,
+            "session_id": session.id,
         }
 
     @api.model

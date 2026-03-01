@@ -12,4 +12,18 @@
         <field name="domain_force">[('session_id.user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('base.group_user'))]"/>
     </record>
+
+    <record id="prema_ai_document_user_rule" model="ir.rule">
+        <field name="name">Prema AI Document - Own Only</field>
+        <field name="model_id" ref="model_prema_ai_document"/>
+        <field name="domain_force">[('session_id.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="prema_ai_tool_log_user_rule" model="ir.rule">
+        <field name="name">Prema AI Tool Log - Own Only</field>
+        <field name="model_id" ref="model_prema_ai_tool_log"/>
+        <field name="domain_force">['|', ('user_id', '=', user.id), ('session_id.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
 </odoo>

@@ -8,6 +8,7 @@
             <list>
                 <field name="create_date"/>
                 <field name="user_id"/>
+                <field name="session_id"/>
                 <field name="tool_name"/>
                 <field name="status"/>
             </list>
@@ -24,6 +25,8 @@
                     <group>
                         <field name="create_date" readonly="1"/>
                         <field name="user_id" readonly="1"/>
+                        <field name="session_id" readonly="1"/>
+                        <field name="bill_id" readonly="1"/>
                         <field name="tool_name" readonly="1"/>
                         <field name="status"/>
                     </group>

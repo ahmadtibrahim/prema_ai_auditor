@@ -15,6 +15,12 @@ class AIConsole extends Component {
             activeSessionId: null,
             messages: [],
             input: "",
+            uploadName: "",
+            uploadData: null,
+            uploadMimeType: "",
+            parsedDocument: null,
+            analyzedAttachmentId: null,
+            documentStatus: null,
         });
 
         onWillStart(async () => {
@@ -144,6 +150,89 @@ class AIConsole extends Component {
         this.state.messages.push(result.assistant);
 
         this.state.input = "";
+    }
+
+    async onFileSelected(ev) {
+        const file = ev.target.files && ev.target.files[0];
+        if (!file) {
+            return;
+        }
+        await this._loadFile(file);
+    }
+
+    async onDrop(ev) {
+        ev.preventDefault();
+        const file = ev.dataTransfer?.files?.[0];
+        if (!file) {
+            return;
+        }
+        await this._loadFile(file);
+    }
+
+    onDragOver(ev) {
+        ev.preventDefault();
+    }
+
+    async _loadFile(file) {
+        const data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result || "";
+                const payload = String(result).split(",")[1] || null;
+                resolve(payload);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+
+        this.state.uploadName = file.name;
+        this.state.uploadData = data;
+        this.state.uploadMimeType = file.type || "application/octet-stream";
+    }
+
+    async analyzeDocument() {
+        if (!this.state.activeSessionId || !this.state.uploadData) {
+            return;
+        }
+
+        const attachmentId = await this.orm.create("ir.attachment", [{
+            name: this.state.uploadName,
+            type: "binary",
+            datas: this.state.uploadData,
+            mimetype: this.state.uploadMimeType,
+            res_model: "prema.ai.session",
+            res_id: this.state.activeSessionId,
+        }]);
+
+        const result = await this.orm.call(
+            "prema.ai.session",
+            "analyze_uploaded_document",
+            [this.state.activeSessionId],
+            { attachment_id: attachmentId }
+        );
+
+        this.state.parsedDocument = result.parsed_data;
+        this.state.analyzedAttachmentId = attachmentId;
+        this.state.documentStatus = result.status;
+    }
+
+    async createDraftBill() {
+        if (!this.state.activeSessionId || !this.state.parsedDocument || !this.state.analyzedAttachmentId) {
+            return;
+        }
+
+        const result = await this.orm.call(
+            "prema.ai.session",
+            "create_draft_bill_from_ai",
+            [this.state.activeSessionId],
+            {
+                parsed_data: this.state.parsedDocument,
+                attachment_id: this.state.analyzedAttachmentId,
+            }
+        );
+
+        this.state.documentStatus = "processed";
+        this.notification.add(`Draft bill created: ${result.bill_name}`, { type: "success" });
     }
 }
 

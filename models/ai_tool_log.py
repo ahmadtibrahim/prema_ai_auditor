@@ -8,6 +8,8 @@ class PremaAIToolLog(models.Model):
     _order = "create_date desc"
 
     user_id = fields.Many2one("res.users", required=True)
+    session_id = fields.Many2one("prema.ai.session")
+    bill_id = fields.Many2one("account.move")
     tool_name = fields.Char(required=True)
     input_payload = fields.Text()
     output_payload = fields.Text()

@@ -112,24 +112,27 @@ class AIConsole extends Component {
     // DELETE SESSION
     // ----------------------------
 
-    async deleteSession(id) {
+    async deleteSession(sessionId) {
         try {
-            await this.orm.unlink("prema.ai.session", [id]);
+            await this.orm.call(
+                "prema.ai.session",
+                "unlink",
+                [[sessionId]]
+            );
 
-            if (this.state.activeSessionId === id) {
+            this.state.sessions = this.state.sessions.filter(s => s.id !== sessionId);
+
+            if (this.state.activeSessionId === sessionId) {
                 this.state.activeSessionId = null;
                 this.state.messages = [];
             }
 
-            await this.loadSessions();
-
-            this.notification.add("Session deleted", {
-                type: "info",
+            this.notification.add("Session deleted successfully", {
+                type: "success",
             });
 
         } catch (error) {
-            console.error("Delete error:", error);
-            this.notification.add("Unable to delete session", {
+            this.notification.add("Failed to delete session", {
                 type: "danger",
             });
         }

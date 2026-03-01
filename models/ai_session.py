@@ -135,37 +135,17 @@ class PremaAISession(models.Model):
     def _call_openai(self):
         self.ensure_one()
 
-        api_key = self.env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)
+        api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
         if not api_key:
-            raise UserError(f"OpenAI API key is not configured in System Parameters ({OPENAI_API_KEY_PARAM})")
+            return "OpenAI API key not configured."
 
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are connected to a live Odoo 18 ERP. "
-                    "You may request tools:\n"
-                    "- search_records\n"
-                    "- create_record\n"
-                    "- update_record\n"
-                    "- delete_record\n"
-                    "Always ask confirmation before destructive actions."
-                ),
-            }
-        ]
-        for msg in self.message_ids.sorted("create_date")[-20:]:
-            messages.append({"role": msg.role, "content": msg.content})
-
-        tool_specs = []
-        for name in self._tool_registry().keys():
-            tool_specs.append(
-                {
-                    "type": "function",
-                    "name": name,
-                    "description": f"Execute {name} on Odoo ORM.",
-                    "parameters": {"type": "object", "additionalProperties": True},
-                }
-            )
+        # Build conversation history
+        messages = []
+        for msg in self.message_ids:
+            messages.append({
+                "role": msg.role,
+                "content": msg.content,
+            })
 
         try:
             response = requests.post(
@@ -177,57 +157,16 @@ class PremaAISession(models.Model):
                 json={
                     "model": "gpt-4.1-mini",
                     "input": messages,
-                    "tools": tool_specs,
-                    "tool_choice": "auto",
                 },
                 timeout=60,
             )
+
             response.raise_for_status()
+
             data = response.json()
-        except requests.RequestException as exc:
-            raise UserError(f"OpenAI chat request failed: {exc}")
-        except ValueError as exc:
-            raise UserError(f"OpenAI chat response is not valid JSON: {exc}")
 
-        output = data.get("output", [])
-        tool_calls = [item for item in output if item.get("type") == "function_call"]
-        if tool_calls:
-            tools = self._tool_registry()
-            tool_result_messages = []
-            for call in tool_calls:
-                tool_name = call.get("name")
-                if tool_name not in tools:
-                    raise UserError(f"Tool not registered: {tool_name}")
-                arguments = call.get("arguments") or "{}"
-                params = json.loads(arguments) if isinstance(arguments, str) else (arguments or {})
-                result = tools[tool_name](**params)
-                tool_result_messages.append({
-                    "type": "function_call_output",
-                    "call_id": call.get("call_id"),
-                    "output": json.dumps(result),
-                })
+            # Extract text correctly from Responses API
+            return data["output"][0]["content"][0]["text"]
 
-            followup = requests.post(
-                "https://api.openai.com/v1/responses",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "gpt-4.1-mini",
-                    "input": tool_result_messages,
-                    "previous_response_id": data.get("id"),
-                },
-                timeout=60,
-            )
-            followup.raise_for_status()
-            data = followup.json()
-            output = data.get("output", [])
-
-        text_output = ""
-        for block in output:
-            for item in block.get("content", []):
-                if item.get("type") == "output_text":
-                    text_output += item.get("text", "")
-
-        return text_output or "I could not generate a response."
+        except Exception as e:
+            return f"OpenAI Error: {str(e)}"

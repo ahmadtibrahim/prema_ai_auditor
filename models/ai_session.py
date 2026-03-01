@@ -124,7 +124,10 @@ class PremaAISession(models.Model):
 
         attachment = self.env["ir.attachment"].browse(attachment_id)
         if not attachment or not attachment.datas:
-            raise UserError("Attachment not found or empty.")
+            raise ValueError("Attachment is empty or invalid.")
+
+        if len(attachment.datas) < 50:
+            raise ValueError("Attachment base64 too small.")
 
         file_base64 = (
             attachment.datas.decode("utf-8")

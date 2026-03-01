@@ -205,12 +205,8 @@ class AIConsole extends Component {
         }
     }
 
-    async onFileSelected(ev) {
-        const file = ev.target.files && ev.target.files[0];
-        if (!file) {
-            return;
-        }
-        await this._loadFile(file);
+    onFileSelected(ev) {
+        this.handleFileUpload(ev);
     }
 
     async onDrop(ev) {
@@ -219,42 +215,70 @@ class AIConsole extends Component {
         if (!file) {
             return;
         }
-        await this._loadFile(file);
+
+        this.handleFileUpload({
+            target: {
+                files: [file],
+            },
+        });
     }
 
     onDragOver(ev) {
         ev.preventDefault();
     }
 
-    async _loadFile(file) {
-        const data = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = reader.result || "";
-                const payload = String(result).split(",")[1] || null;
-                resolve(payload);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
+    handleFileUpload(ev) {
+        const file = ev.target.files[0];
 
-        this.state.uploadName = file.name;
-        this.state.uploadData = data;
-        this.state.uploadMimeType = file.type || "application/octet-stream";
-    }
-
-    async analyzeDocument() {
-        if (!this.state.activeSessionId || !this.state.uploadData || this.state.isAnalyzing) {
+        if (!file) {
+            this.state.uploadData = null;
             return;
         }
 
-        this.state.isAnalyzing = true;
+        const reader = new FileReader();
+
+        reader.onload = (event) => {
+            const result = event.target.result;
+
+            if (!result || !result.includes(",")) {
+                console.error("Invalid file reader result:", result);
+                this.state.uploadData = null;
+                return;
+            }
+
+            const base64 = result.split(",")[1];
+
+            if (!base64 || base64.length < 50) {
+                console.error("Base64 too small or invalid");
+                this.state.uploadData = null;
+                return;
+            }
+
+            this.state.uploadData = base64;
+            this.state.uploadName = file.name || "document.pdf";
+            this.state.uploadMimeType = file.type || "application/pdf";
+        };
+
+        reader.onerror = () => {
+            console.error("File read error");
+            this.state.uploadData = null;
+        };
+
+        reader.readAsDataURL(file);
+    }
+
+    async analyzeDocument() {
+        if (!this.state.uploadData) {
+            this.notification.add("File not properly loaded.", { type: "danger" });
+            return;
+        }
+
         try {
             const attachmentId = await this.orm.create("ir.attachment", [{
                 name: this.state.uploadName,
                 type: "binary",
                 datas: this.state.uploadData,
-                mimetype: this.state.uploadMimeType,
+                mimetype: "application/pdf",
                 res_model: "prema.ai.session",
                 res_id: this.state.activeSessionId,
             }]);
@@ -262,34 +286,14 @@ class AIConsole extends Component {
             const result = await this.orm.call(
                 "prema.ai.session",
                 "analyze_uploaded_document",
-                [[this.state.activeSessionId]],
+                [this.state.activeSessionId],
                 { attachment_id: attachmentId }
             );
 
-            let parsedDocument = result.parsed_data;
-            if (typeof parsedDocument === "string") {
-                try {
-                    parsedDocument = JSON.parse(parsedDocument);
-                } catch (_error) {
-                    parsedDocument = null;
-                }
-            }
-
-            this.state.parsedDocument = parsedDocument || {
-                vendor_name: "N/A",
-                invoice_number: "N/A",
-                invoice_date: "N/A",
-                total: "N/A",
-                line_items: [],
-                suggested_action: typeof result.parsed_data === "string" ? result.parsed_data : JSON.stringify(result.parsed_data),
-            };
-            this.state.analyzedAttachmentId = attachmentId;
-            this.state.documentStatus = result.status;
+            console.log("Analyze success:", result);
         } catch (error) {
-            console.error(error);
-            this.notification.add("Failed to analyze document", { type: "danger" });
-        } finally {
-            this.state.isAnalyzing = false;
+            console.error("Analyze RPC error:", error);
+            this.notification.add("Failed to analyze document.", { type: "danger" });
         }
     }
 

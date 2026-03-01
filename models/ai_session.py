@@ -1,4 +1,5 @@
 from odoo import api, models, fields
+from odoo.exceptions import UserError
 import requests
 import json
 
@@ -76,86 +77,108 @@ class PremaAISession(models.Model):
 
     @api.model
     def analyze_uploaded_document(self, *args, **kwargs):
-        session_arg = args[0] if args else []
+        session_id = False
+        if args:
+            first_arg = args[0]
+            if isinstance(first_arg, int):
+                session_id = first_arg
+            elif isinstance(first_arg, (list, tuple)) and first_arg:
+                session_id = first_arg[0]
+
         attachment_id = kwargs.get("attachment_id")
 
-        if isinstance(session_arg, int):
-            session_id = session_arg
-        elif isinstance(session_arg, (list, tuple)) and session_arg:
-            session_id = session_arg[0]
-        else:
-            session_id = False
-
         if not session_id:
-            raise ValueError("Session context missing.")
+            raise UserError("Session context missing.")
 
         session = self.browse(session_id)
         session.ensure_one()
 
         if not attachment_id:
-            raise ValueError("attachment_id is required.")
+            raise UserError("attachment_id is required.")
 
         api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
         if not api_key:
-            raise ValueError("OpenAI API key not configured.")
+            raise UserError("OpenAI API key not configured.")
 
         attachment = self.env["ir.attachment"].browse(attachment_id)
         if not attachment or not attachment.datas:
-            raise ValueError("Attachment not found or empty.")
+            raise UserError("Attachment not found or empty.")
 
-        file_base64 = attachment.datas.decode() if isinstance(attachment.datas, bytes) else attachment.datas
+        file_base64 = (
+            attachment.datas.decode("utf-8")
+            if isinstance(attachment.datas, (bytes, bytearray))
+            else attachment.datas
+        )
+        mimetype = attachment.mimetype or "application/pdf"
+        data_url = f"data:{mimetype};base64,{file_base64}"
 
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-
+        prompt = (
+            "You are an AI assistant extracting invoice data from PDFs. "
+            "Return a compact JSON object with vendor_name, invoice_number, invoice_date, "
+            "subtotal, tax, total, and line_items (an array of {description, quantity, unit_price, amount}). "
+            "Return only valid JSON without additional text."
+        )
         payload = {
             "model": "gpt-4.1-mini",
             "input": [
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "input_text",
-                            "text": "Extract structured invoice data as JSON. Return only valid JSON.",
-                        },
-                        {
-                            "type": "input_file",
-                            "file_data": file_base64,
-                            "filename": attachment.name,
-                            "mime_type": attachment.mimetype or "application/pdf",
-                        },
+                        {"type": "input_text", "text": prompt},
+                        {"type": "input_file", "filename": attachment.name, "file_data": data_url},
                     ],
                 }
             ],
         }
 
-        response = requests.post(
-            "https://api.openai.com/v1/responses",
-            headers=headers,
-            json=payload,
-            timeout=90,
-        )
-
-        if response.status_code != 200:
-            raise ValueError(response.text)
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/responses",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=90,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UserError(f"OpenAI request failed: {exc}")
 
         data = response.json()
-
         text_output = ""
         for block in data.get("output", []):
             for item in block.get("content", []):
                 if item.get("type") == "output_text":
                     text_output += item.get("text", "")
 
-        document = self.env["prema.ai.document"].create({
+        parsed_data = None
+        if text_output:
+            try:
+                parsed_data = json.loads(text_output)
+            except json.JSONDecodeError:
+                parsed_data = None
+
+        document_vals = {
             "name": attachment.name,
             "attachment_id": attachment.id,
-            "ai_summary": text_output,
-            "status": "analyzed",
             "session_id": session.id,
-        })
+            "status": "analyzed",
+            "ai_summary": text_output,
+        }
+
+        if parsed_data:
+            document_vals.update({
+                "vendor_name": parsed_data.get("vendor_name"),
+                "invoice_number": parsed_data.get("invoice_number"),
+                "invoice_date": parsed_data.get("invoice_date"),
+                "subtotal": parsed_data.get("subtotal"),
+                "tax": parsed_data.get("tax"),
+                "total": parsed_data.get("total"),
+                "line_items": json.dumps(parsed_data.get("line_items", [])),
+            })
+
+        document = self.env["prema.ai.document"].create(document_vals)
 
         self.env["prema.ai.tool.log"].create({
             "user_id": self.env.user.id,
@@ -168,8 +191,92 @@ class PremaAISession(models.Model):
 
         return {
             "document_id": document.id,
-            "parsed_data": text_output,
-            "status": "analyzed",
+            "parsed_data": parsed_data or text_output,
+            "status": document.status,
+        }
+
+    @api.model
+    def create_draft_bill_from_ai(self, *args, **kwargs):
+        session_id = False
+        if args:
+            first_arg = args[0]
+            if isinstance(first_arg, int):
+                session_id = first_arg
+            elif isinstance(first_arg, (list, tuple)) and first_arg:
+                session_id = first_arg[0]
+
+        if not session_id:
+            raise UserError("Session context missing.")
+
+        session = self.browse(session_id)
+        session.ensure_one()
+
+        parsed_data = kwargs.get("parsed_data")
+        attachment_id = kwargs.get("attachment_id")
+        if not parsed_data or not attachment_id:
+            raise UserError("parsed_data and attachment_id are required")
+
+        if isinstance(parsed_data, str):
+            try:
+                parsed_data = json.loads(parsed_data)
+            except json.JSONDecodeError:
+                raise UserError("parsed_data must be valid JSON")
+
+        vendor_name = parsed_data.get("vendor_name") or "Unknown Vendor"
+        partner = self.env["res.partner"].search([("name", "=ilike", vendor_name)], limit=1)
+        if not partner:
+            partner = self.env["res.partner"].create({"name": vendor_name})
+
+        invoice_number = parsed_data.get("invoice_number")
+        invoice_date = parsed_data.get("invoice_date")
+        existing = self.env["account.move"].search([
+            ("move_type", "=", "in_invoice"),
+            ("partner_id", "=", partner.id),
+            ("invoice_date", "=", invoice_date),
+            ("ref", "=", invoice_number),
+        ], limit=1)
+        if existing:
+            raise UserError("A bill with this vendor and invoice number already exists.")
+
+        expense_account = self.env["account.account"].search([
+            ("account_type", "=", "expense"),
+        ], limit=1)
+        if not expense_account:
+            raise UserError("No expense account found to build draft bill suggestion.")
+
+        move_vals = {
+            "move_type": "in_invoice",
+            "partner_id": partner.id,
+            "invoice_date": invoice_date,
+            "ref": invoice_number,
+            "invoice_line_ids": [],
+        }
+
+        for line in parsed_data.get("line_items", []):
+            move_vals["invoice_line_ids"].append((0, 0, {
+                "name": line.get("description") or "AI extracted line",
+                "quantity": line.get("quantity", 1),
+                "price_unit": line.get("unit_price", 0.0),
+                "account_id": expense_account.id,
+            }))
+
+        tool_log = self.env["prema.ai.tool.log"].create({
+            "user_id": self.env.user.id,
+            "session_id": session.id,
+            "tool_name": "create_draft_bill_from_ai",
+            "input_payload": json.dumps({"parsed_data": parsed_data, "attachment_id": attachment_id}),
+            "output_payload": json.dumps(move_vals),
+            "status": "suggested",
+        })
+
+        self.env["prema.ai.document"].search([
+            ("session_id", "=", session.id),
+            ("attachment_id", "=", attachment_id),
+        ], limit=1).write({"status": "draft_created"})
+
+        return {
+            "bill_name": invoice_number,
+            "tool_log_id": tool_log.id,
         }
 
     # =====================================================

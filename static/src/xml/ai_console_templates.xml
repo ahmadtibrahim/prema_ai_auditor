@@ -20,18 +20,18 @@
 
                         <div class="o_ai_session_item"
                              t-att-class="{'active': sess.id === state.activeSessionId}"
-                             t-on-click="() => selectSession(sess.id)">
+                             t-on-click="selectSession(sess.id)">
 
                             <!-- Editable session name -->
                             <input type="text"
                                    t-model="sess.name"
-                                   t-on-blur="() => renameSession(sess)"
+                                   t-on-blur="renameSession(sess)"
                                    t-on-click.stop=""
                                    class="o_ai_session_name"/>
 
                             <!-- Delete icon -->
                             <i class="fa fa-trash o_ai_delete_icon"
-                               t-on-click.stop="() => deleteSession(sess.id)"/>
+                               t-on-click.stop="deleteSession(sess.id)"/>
 
                         </div>
 
@@ -74,7 +74,7 @@
                     <div class="mb-2"><strong>Upload Document</strong></div>
                     <input type="file" t-on-change="onFileSelected"/>
                     <div t-if="state.uploadName" class="mt-2">Selected: <t t-esc="state.uploadName"/></div>
-                    <button t-on-click="analyzeDocument" class="btn btn-outline-primary mt-2">Analyze Document</button>
+                    <button t-on-click="analyzeDocument" class="btn btn-outline-primary mt-2" t-att-disabled="state.isAnalyzing or !state.uploadData"><t t-esc="state.isAnalyzing ? 'Analyzing...' : 'Analyze Document'"/></button>
                 </div>
 
                 <div t-if="state.parsedDocument" class="o_ai_doc_preview mt-3 p-3 border rounded">
@@ -83,8 +83,9 @@
                         <span class="badge text-bg-info"><t t-esc="state.documentStatus || 'analyzed'"/></span>
                     </div>
                     <div class="mt-2">Vendor: <t t-esc="state.parsedDocument.vendor_name"/></div>
-                    <div>Date: <t t-esc="state.parsedDocument.bill_date"/></div>
-                    <div>Total: <t t-esc="state.parsedDocument.total_amount"/></div>
+                    <div>Invoice #: <t t-esc="state.parsedDocument.invoice_number"/></div>
+                    <div>Date: <t t-esc="state.parsedDocument.invoice_date"/></div>
+                    <div>Total: <t t-esc="state.parsedDocument.total"/></div>
                     <div class="mt-2"><strong>Suggested Action</strong></div>
                     <div><t t-esc="state.parsedDocument.suggested_action"/></div>
                     <button t-on-click="createDraftBill" class="btn btn-success mt-2">Create Draft Bill</button>

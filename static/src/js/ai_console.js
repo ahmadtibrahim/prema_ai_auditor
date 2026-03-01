@@ -21,6 +21,7 @@ class AIConsole extends Component {
             parsedDocument: null,
             analyzedAttachmentId: null,
             documentStatus: null,
+            isAnalyzing: false,
         });
 
         onWillStart(async () => {
@@ -33,30 +34,40 @@ class AIConsole extends Component {
     // ----------------------------
 
     async loadSessions() {
-        const sessions = await this.orm.searchRead(
-            "prema.ai.session",
-            [],
-            ["name"]
-        );
+        try {
+            const sessions = await this.orm.searchRead(
+                "prema.ai.session",
+                [],
+                ["name"]
+            );
 
-        this.state.sessions = sessions;
+            this.state.sessions = sessions;
 
-        if (sessions.length && !this.state.activeSessionId) {
-            this.state.activeSessionId = sessions[0].id;
-            await this.loadMessages();
+            if (sessions.length && !this.state.activeSessionId) {
+                this.state.activeSessionId = sessions[0].id;
+                await this.loadMessages();
+            }
+        } catch (error) {
+            console.error(error);
+            this.notification.add("Failed to load sessions", { type: "danger" });
         }
     }
 
     async loadMessages() {
         if (!this.state.activeSessionId) return;
 
-        const messages = await this.orm.searchRead(
-            "prema.ai.message",
-            [["session_id", "=", this.state.activeSessionId]],
-            ["role", "content"]
-        );
+        try {
+            const messages = await this.orm.searchRead(
+                "prema.ai.message",
+                [["session_id", "=", this.state.activeSessionId]],
+                ["role", "content"]
+            );
 
-        this.state.messages = messages;
+            this.state.messages = messages;
+        } catch (error) {
+            console.error(error);
+            this.notification.add("Failed to load messages", { type: "danger" });
+        }
     }
 
     async selectSession(id) {
@@ -69,13 +80,18 @@ class AIConsole extends Component {
     // ----------------------------
 
     async createNewSession() {
-        const id = await this.orm.create("prema.ai.session", [{
-            name: "New Chat"
-        }]);
+        try {
+            const id = await this.orm.create("prema.ai.session", [{
+                name: "New Chat"
+            }]);
 
-        await this.loadSessions();
-        this.state.activeSessionId = id;
-        await this.loadMessages();
+            await this.loadSessions();
+            this.state.activeSessionId = id;
+            await this.loadMessages();
+        } catch (error) {
+            console.error(error);
+            this.notification.add("Failed to create session", { type: "danger" });
+        }
     }
 
     // ----------------------------
@@ -120,18 +136,19 @@ class AIConsole extends Component {
                 [[sessionId]]
             );
 
-            this.state.sessions = this.state.sessions.filter(s => s.id !== sessionId);
-
             if (this.state.activeSessionId === sessionId) {
                 this.state.activeSessionId = null;
                 this.state.messages = [];
             }
+
+            await this.loadSessions();
 
             this.notification.add("Session deleted successfully", {
                 type: "success",
             });
 
         } catch (error) {
+            console.error(error);
             this.notification.add("Failed to delete session", {
                 type: "danger",
             });
@@ -145,17 +162,21 @@ class AIConsole extends Component {
     async sendMessage() {
         if (!this.state.input.trim() || !this.state.activeSessionId) return;
 
-        const result = await this.orm.call(
-            "prema.ai.session",
-            "send_user_message",
-            [this.state.activeSessionId],
-            { content: this.state.input }
-        );
+        try {
+            const result = await this.orm.call(
+                "prema.ai.session",
+                "send_user_message",
+                [this.state.activeSessionId],
+                { content: this.state.input }
+            );
 
-        this.state.messages.push(result.user);
-        this.state.messages.push(result.assistant);
-
-        this.state.input = "";
+            this.state.messages.push(result.user);
+            this.state.messages.push(result.assistant);
+            this.state.input = "";
+        } catch (error) {
+            console.error(error);
+            this.notification.add("Failed to send message", { type: "danger" });
+        }
     }
 
     async onFileSelected(ev) {
@@ -197,43 +218,53 @@ class AIConsole extends Component {
     }
 
     async analyzeDocument() {
-        if (!this.state.activeSessionId || !this.state.uploadData) {
+        if (!this.state.activeSessionId || !this.state.uploadData || this.state.isAnalyzing) {
             return;
         }
 
-        const attachmentId = await this.orm.create("ir.attachment", [{
-            name: this.state.uploadName,
-            type: "binary",
-            datas: this.state.uploadData,
-            mimetype: this.state.uploadMimeType,
-            res_model: "prema.ai.session",
-            res_id: this.state.activeSessionId,
-        }]);
+        this.state.isAnalyzing = true;
+        try {
+            const attachmentId = await this.orm.create("ir.attachment", [{
+                name: this.state.uploadName,
+                type: "binary",
+                datas: this.state.uploadData,
+                mimetype: this.state.uploadMimeType,
+                res_model: "prema.ai.session",
+                res_id: this.state.activeSessionId,
+            }]);
 
-        const result = await this.orm.call(
-            "prema.ai.session",
-            "analyze_uploaded_document",
-            [this.state.activeSessionId],
-            { attachment_id: attachmentId }
-        );
+            const result = await this.orm.call(
+                "prema.ai.session",
+                "analyze_uploaded_document",
+                [this.state.activeSessionId],
+                { attachment_id: attachmentId }
+            );
 
-        let parsedDocument = result.parsed_data;
-        if (typeof parsedDocument === "string") {
-            try {
-                parsedDocument = JSON.parse(parsedDocument);
-            } catch (_error) {
-                parsedDocument = {
-                    vendor_name: "N/A",
-                    bill_date: "N/A",
-                    total_amount: "N/A",
-                    suggested_action: result.parsed_data,
-                };
+            let parsedDocument = result.parsed_data;
+            if (typeof parsedDocument === "string") {
+                try {
+                    parsedDocument = JSON.parse(parsedDocument);
+                } catch (_error) {
+                    parsedDocument = null;
+                }
             }
-        }
 
-        this.state.parsedDocument = parsedDocument;
-        this.state.analyzedAttachmentId = attachmentId;
-        this.state.documentStatus = result.status;
+            this.state.parsedDocument = parsedDocument || {
+                vendor_name: "N/A",
+                invoice_number: "N/A",
+                invoice_date: "N/A",
+                total: "N/A",
+                line_items: [],
+                suggested_action: typeof result.parsed_data === "string" ? result.parsed_data : JSON.stringify(result.parsed_data),
+            };
+            this.state.analyzedAttachmentId = attachmentId;
+            this.state.documentStatus = result.status;
+        } catch (error) {
+            console.error(error);
+            this.notification.add("Failed to analyze document", { type: "danger" });
+        } finally {
+            this.state.isAnalyzing = false;
+        }
     }
 
     async createDraftBill() {
@@ -241,18 +272,23 @@ class AIConsole extends Component {
             return;
         }
 
-        const result = await this.orm.call(
-            "prema.ai.session",
-            "create_draft_bill_from_ai",
-            [this.state.activeSessionId],
-            {
-                parsed_data: this.state.parsedDocument,
-                attachment_id: this.state.analyzedAttachmentId,
-            }
-        );
+        try {
+            const result = await this.orm.call(
+                "prema.ai.session",
+                "create_draft_bill_from_ai",
+                [this.state.activeSessionId],
+                {
+                    parsed_data: this.state.parsedDocument,
+                    attachment_id: this.state.analyzedAttachmentId,
+                }
+            );
 
-        this.state.documentStatus = "processed";
-        this.notification.add(`Draft bill created: ${result.bill_name}`, { type: "success" });
+            this.state.documentStatus = "draft_created";
+            this.notification.add(`Draft bill suggestion created: ${result.bill_name || "N/A"}`, { type: "success" });
+        } catch (error) {
+            console.error(error);
+            this.notification.add("Failed to create draft bill", { type: "danger" });
+        }
     }
 }
 

@@ -22,6 +22,9 @@ class AIConsole extends Component {
             analyzedAttachmentId: null,
             documentStatus: null,
             isAnalyzing: false,
+            renamingSessionIds: [],
+            deletingSessionIds: [],
+            savedSessionNames: {},
         });
 
         onWillStart(async () => {
@@ -42,6 +45,9 @@ class AIConsole extends Component {
             );
 
             this.state.sessions = sessions;
+            this.state.savedSessionNames = Object.fromEntries(
+                sessions.map((session) => [session.id, session.name || ""])
+            );
 
             if (sessions.length && !this.state.activeSessionId) {
                 this.state.activeSessionId = sessions[0].id;
@@ -81,12 +87,13 @@ class AIConsole extends Component {
 
     async createNewSession() {
         try {
-            const id = await this.orm.create("prema.ai.session", [{
+            const createResult = await this.orm.create("prema.ai.session", [{
                 name: "New Chat"
             }]);
+            const id = Array.isArray(createResult) ? createResult[0] : createResult;
 
             await this.loadSessions();
-            this.state.activeSessionId = id;
+            this.state.activeSessionId = id || null;
             await this.loadMessages();
         } catch (error) {
             console.error(error);
@@ -99,28 +106,40 @@ class AIConsole extends Component {
     // ----------------------------
 
     async renameSession(session) {
-        try {
-            if (!session.name || !session.name.trim()) {
-                this.notification.add("Session name cannot be empty", {
-                    type: "warning",
-                });
-                return;
-            }
+        const newName = (session.name || "").trim();
+        const oldName = (this.state.savedSessionNames[session.id] || "").trim();
 
-            await this.orm.write(
+        if (!newName) {
+            session.name = oldName;
+            this.notification.add("Session name cannot be empty", {
+                type: "warning",
+            });
+            return;
+        }
+
+        if (newName === oldName || this.state.renamingSessionIds.includes(session.id)) {
+            return;
+        }
+
+        this.state.renamingSessionIds = [...this.state.renamingSessionIds, session.id];
+
+        try {
+            await this.orm.call(
                 "prema.ai.session",
-                [session.id],
-                { name: session.name }
+                "action_rename_session",
+                [[session.id], newName]
             );
 
+            await this.loadSessions();
             this.notification.add("Session renamed", {
                 type: "success",
             });
-
-            await this.loadSessions();
-
         } catch (error) {
+            session.name = oldName;
             console.error("Rename error:", error);
+            this.notification.add("Failed to rename session", { type: "danger" });
+        } finally {
+            this.state.renamingSessionIds = this.state.renamingSessionIds.filter((id) => id !== session.id);
         }
     }
 
@@ -129,10 +148,16 @@ class AIConsole extends Component {
     // ----------------------------
 
     async deleteSession(sessionId) {
+        if (this.state.deletingSessionIds.includes(sessionId)) {
+            return;
+        }
+
+        this.state.deletingSessionIds = [...this.state.deletingSessionIds, sessionId];
+
         try {
             await this.orm.call(
                 "prema.ai.session",
-                "unlink",
+                "action_delete_session",
                 [[sessionId]]
             );
 
@@ -152,6 +177,8 @@ class AIConsole extends Component {
             this.notification.add("Failed to delete session", {
                 type: "danger",
             });
+        } finally {
+            this.state.deletingSessionIds = this.state.deletingSessionIds.filter((id) => id !== sessionId);
         }
     }
 
@@ -166,8 +193,7 @@ class AIConsole extends Component {
             const result = await this.orm.call(
                 "prema.ai.session",
                 "send_user_message",
-                [this.state.activeSessionId],
-                { content: this.state.input }
+                [[this.state.activeSessionId], this.state.input]
             );
 
             this.state.messages.push(result.user);
@@ -236,7 +262,7 @@ class AIConsole extends Component {
             const result = await this.orm.call(
                 "prema.ai.session",
                 "analyze_uploaded_document",
-                [this.state.activeSessionId],
+                [[this.state.activeSessionId]],
                 { attachment_id: attachmentId }
             );
 
@@ -276,7 +302,7 @@ class AIConsole extends Component {
             const result = await this.orm.call(
                 "prema.ai.session",
                 "create_draft_bill_from_ai",
-                [this.state.activeSessionId],
+                [[this.state.activeSessionId]],
                 {
                     parsed_data: this.state.parsedDocument,
                     attachment_id: this.state.analyzedAttachmentId,

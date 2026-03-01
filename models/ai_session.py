@@ -2,7 +2,7 @@ import json
 
 import requests
 
-from odoo import fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 OPENAI_API_KEY_PARAM = "openai.api_key"
@@ -17,6 +17,7 @@ class PremaAISession(models.Model):
     user_id = fields.Many2one("res.users", default=lambda self: self.env.user)
     message_ids = fields.One2many("prema.ai.message", "session_id")
 
+    @api.model
     def list_sessions(self):
         sessions = self.search(
             [("user_id", "=", self.env.user.id)],

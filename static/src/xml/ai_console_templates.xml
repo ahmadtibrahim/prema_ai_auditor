@@ -8,6 +8,7 @@
 
                 <div class="o_ai_sidebar_header">
                     <button t-on-click="createNewSession"
+                            t-att-disabled="state.isCreatingSession"
                             class="btn btn-primary w-100">
                         + New Chat
                     </button>

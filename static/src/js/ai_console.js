@@ -26,7 +26,12 @@ class AIConsole extends Component {
             renamingSessionIds: [],
             deletingSessionIds: [],
             savedSessionNames: {},
+            isCreatingSession: false,
         });
+
+        this._isLoadingSessions = false;
+        this._isLoadingMessages = false;
+        this._loadingMessagesForSessionId = null;
 
         onWillStart(async () => {
             await this.loadSessions();
@@ -38,6 +43,12 @@ class AIConsole extends Component {
     // ----------------------------
 
     async loadSessions() {
+        if (this._isLoadingSessions) {
+            return;
+        }
+
+        this._isLoadingSessions = true;
+
         try {
             const sessions = await this.callKw("prema.ai.session", "search_read", [[], ["name"]]);
 
@@ -53,11 +64,20 @@ class AIConsole extends Component {
         } catch (error) {
             console.error(error);
             this.notification.add("Failed to load sessions", { type: "danger" });
+        } finally {
+            this._isLoadingSessions = false;
         }
     }
 
     async loadMessages() {
         if (!this.state.activeSessionId) return;
+
+        if (this._isLoadingMessages && this._loadingMessagesForSessionId === this.state.activeSessionId) {
+            return;
+        }
+
+        this._isLoadingMessages = true;
+        this._loadingMessagesForSessionId = this.state.activeSessionId;
 
         try {
             const messages = await this.callKw(
@@ -70,6 +90,9 @@ class AIConsole extends Component {
         } catch (error) {
             console.error(error);
             this.notification.add("Failed to load messages", { type: "danger" });
+        } finally {
+            this._isLoadingMessages = false;
+            this._loadingMessagesForSessionId = null;
         }
     }
 
@@ -83,6 +106,12 @@ class AIConsole extends Component {
     // ----------------------------
 
     async createNewSession() {
+        if (this.state.isCreatingSession) {
+            return;
+        }
+
+        this.state.isCreatingSession = true;
+
         try {
             const sessionId = await this.callKw(
                 "prema.ai.session",
@@ -99,6 +128,8 @@ class AIConsole extends Component {
         } catch (error) {
             console.error("Create session error:", error);
             this.notification.add("Failed to create session.", { type: "danger" });
+        } finally {
+            this.state.isCreatingSession = false;
         }
     }
 
@@ -262,6 +293,12 @@ class AIConsole extends Component {
             return;
         }
 
+        if (this.state.isAnalyzing) {
+            return;
+        }
+
+        this.state.isAnalyzing = true;
+
         try {
             const attachmentId = await this.callKw("ir.attachment", "create", [[{
                 name: this.state.uploadName,
@@ -293,6 +330,8 @@ class AIConsole extends Component {
         } catch (error) {
             console.error("Analyze RPC error:", error);
             this.notification.add("Failed to analyze document.", { type: "danger" });
+        } finally {
+            this.state.isAnalyzing = false;
         }
     }
 

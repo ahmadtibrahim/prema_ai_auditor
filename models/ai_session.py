@@ -1,5 +1,4 @@
 from odoo import models, fields, api
-from odoo.exceptions import UserError
 import requests
 import json
 
@@ -21,20 +20,15 @@ class PremaAISession(models.Model):
         "prema.ai.message",
         "session_id",
     )
-    document_ids = fields.One2many("prema.ai.document", "session_id")
 
-    # -------------------------------------------------------
+    # =====================================================
     # TOOL REGISTRY
-    # -------------------------------------------------------
+    # =====================================================
 
     def _tool_registry(self):
         return {
             "scan_chart_of_accounts": self._tool_scan_chart_of_accounts,
         }
-
-    # -------------------------------------------------------
-    # TOOL IMPLEMENTATION
-    # -------------------------------------------------------
 
     def _tool_scan_chart_of_accounts(self, payload=None):
         accounts = self.env["account.account"].search([])
@@ -49,9 +43,9 @@ class PremaAISession(models.Model):
 
         return findings
 
-    # -------------------------------------------------------
-    # SEND MESSAGE ENTRYPOINT (RECORD BASED)
-    # -------------------------------------------------------
+    # =====================================================
+    # CHAT MESSAGE ENTRYPOINT
+    # =====================================================
 
     def send_user_message(self, content):
         self.ensure_one()
@@ -65,7 +59,7 @@ class PremaAISession(models.Model):
             "content": content.strip(),
         })
 
-        assistant_reply = self._call_openai(self)
+        assistant_reply = self._call_openai()
 
         return {
             "user": {
@@ -76,203 +70,103 @@ class PremaAISession(models.Model):
             "assistant": assistant_reply,
         }
 
-    def analyze_uploaded_document(self, attachment_id):
-        self.ensure_one()
+    # =====================================================
+    # DOCUMENT ANALYSIS (VISION)
+    # =====================================================
 
-        attachment = self.env["ir.attachment"].browse(attachment_id)
-        if not attachment.exists():
-            raise UserError("Attachment not found.")
+    @api.model
+    def analyze_uploaded_document(self, *args, **kwargs):
+        attachment_id = kwargs.get("attachment_id")
 
-        if not attachment.datas:
-            raise UserError("Attachment content is empty.")
+        if not attachment_id:
+            raise ValueError("attachment_id is required.")
 
         api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
         if not api_key:
-            raise UserError("OpenAI API key not configured.")
+            raise ValueError("OpenAI API key not configured.")
 
-        vision_prompt = (
-            "Extract a JSON object with keys: vendor_name, bill_date, total_amount, tax_amount, "
-            "line_items (array of {description, quantity, unit_price, amount}), keywords (array), "
-            "document_type (bill/license/insurance/unknown), and suggested_action. "
-            "Return only valid JSON."
+        attachment = self.env["ir.attachment"].browse(attachment_id)
+        if not attachment:
+            raise ValueError("Attachment not found.")
+
+        file_base64 = attachment.datas
+        if not file_base64:
+            raise ValueError("Attachment has no data.")
+
+        response = requests.post(
+            "https://api.openai.com/v1/responses",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gpt-4.1-mini",
+                "input": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Extract structured invoice data as JSON. Return only valid JSON."
+                            },
+                            {
+                                "type": "input_image",
+                                "image_base64": file_base64
+                            }
+                        ],
+                    }
+                ],
+            },
+            timeout=60,
         )
 
-        payload = {
-            "model": "gpt-4o-mini",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": vision_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{attachment.mimetype or 'application/octet-stream'};base64,{attachment.datas}"
-                            },
-                        },
-                    ],
-                }
-            ],
-            "response_format": {"type": "json_object"},
-        }
+        if response.status_code != 200:
+            raise ValueError(response.text)
 
-        try:
-            response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                data=json.dumps(payload),
-                timeout=45,
-            )
-            response.raise_for_status()
-            raw_content = response.json()["choices"][0]["message"].get("content", "{}")
-            parsed_data = json.loads(raw_content)
-        except (requests.RequestException, KeyError, json.JSONDecodeError) as error:
-            raise UserError(f"Document analysis failed: {error}")
+        data = response.json()
+
+        output_text = ""
+        if data.get("output"):
+            for item in data["output"][0].get("content", []):
+                if item.get("type") == "output_text":
+                    output_text += item.get("text", "")
 
         document = self.env["prema.ai.document"].create({
-            "name": attachment.name or "Uploaded Document",
-            "session_id": self.id,
+            "name": attachment.name,
             "attachment_id": attachment.id,
-            "document_type": parsed_data.get("document_type", "unknown"),
-            "ai_summary": json.dumps(parsed_data),
-            "ai_suggested_action": parsed_data.get("suggested_action", ""),
+            "raw_ai_response": output_text,
             "status": "analyzed",
         })
 
         self.env["prema.ai.tool.log"].create({
             "user_id": self.env.user.id,
             "tool_name": "analyze_document",
-            "input_payload": json.dumps({"attachment_id": attachment.id}),
-            "output_payload": json.dumps(parsed_data),
-            "status": "suggested",
-            "session_id": self.id,
+            "input_payload": json.dumps({"attachment_id": attachment_id}),
+            "output_payload": output_text,
+            "status": "executed",
         })
 
         return {
             "document_id": document.id,
-            "parsed_data": parsed_data,
-            "status": document.status,
+            "parsed_data": output_text,
         }
 
-    def create_draft_bill_from_ai(self, parsed_data, attachment_id):
+    # =====================================================
+    # OPENAI CHAT CALL
+    # =====================================================
+
+    def _call_openai(self):
         self.ensure_one()
-        partner_name = (parsed_data or {}).get("vendor_name")
-        if not partner_name:
-            raise UserError("Vendor name is required to create a draft bill.")
 
-        partner = self.env["res.partner"].search([("name", "=", partner_name)], limit=1)
-        if not partner:
-            partner = self.env["res.partner"].create({"name": partner_name, "supplier_rank": 1})
-
-        keywords = ", ".join((parsed_data or {}).get("keywords", []))
-        suggested_account = self.env["prema.ai.learning.engine"].suggest_account(partner.id, keywords)
-        if not suggested_account:
-            suggested_account = self.env["account.account"].search(
-                [
-                    ("company_id", "=", self.env.company.id),
-                    ("account_type", "in", ["expense", "expense_direct_cost"]),
-                    ("deprecated", "=", False),
-                ],
-                limit=1,
-            )
-        if not suggested_account:
-            raise UserError("No suitable expense account found for draft bill line.")
-
-        line_items = (parsed_data or {}).get("line_items") or []
-        if not line_items:
-            line_items = [{
-                "description": "AI Suggested Expense",
-                "quantity": 1.0,
-                "unit_price": (parsed_data or {}).get("total_amount") or 0.0,
-                "amount": (parsed_data or {}).get("total_amount") or 0.0,
-            }]
-
-        invoice_lines = []
-        for item in line_items:
-            quantity = item.get("quantity") or 1.0
-            price_unit = item.get("unit_price")
-            if price_unit is None:
-                amount = item.get("amount") or 0.0
-                price_unit = amount / quantity if quantity else amount
-            invoice_lines.append((0, 0, {
-                "name": item.get("description") or "AI Line",
-                "quantity": quantity,
-                "price_unit": price_unit,
-                "account_id": suggested_account.id,
-            }))
-
-        bill_vals = {
-            "move_type": "in_invoice",
-            "partner_id": partner.id,
-            "invoice_date": (parsed_data or {}).get("bill_date") or fields.Date.context_today(self),
-            "invoice_line_ids": invoice_lines,
-            "created_from_ai": True,
-            "ai_session_id": self.id,
-            "ai_detected_keywords": keywords,
-        }
-        bill = self.env["account.move"].create(bill_vals)
-
-        attachment = self.env["ir.attachment"].browse(attachment_id)
-        if attachment.exists():
-            attachment.write({
-                "res_model": "account.move",
-                "res_id": bill.id,
-            })
-
-            document = self.env["prema.ai.document"].search(
-                [
-                    ("session_id", "=", self.id),
-                    ("attachment_id", "=", attachment.id),
-                ],
-                limit=1,
-            )
-            if document:
-                document.write({"status": "processed"})
-
-        self.env["prema.ai.tool.log"].create({
-            "user_id": self.env.user.id,
-            "tool_name": "create_draft_bill",
-            "input_payload": json.dumps({"attachment_id": attachment_id, "parsed_data": parsed_data}),
-            "output_payload": json.dumps({"bill_id": bill.id}),
-            "status": "executed",
-            "session_id": self.id,
-            "bill_id": bill.id,
-        })
-
-        return {
-            "bill_id": bill.id,
-            "bill_name": bill.name,
-            "partner_id": partner.id,
-        }
-
-    # -------------------------------------------------------
-    # OPENAI CALL
-    # -------------------------------------------------------
-
-    def _call_openai(self, session):
         api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
         if not api_key:
             raise ValueError("OpenAI API key not configured.")
 
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-
-        history = session.message_ids.sorted("create_date")[-20:]
+        history = self.message_ids.sorted("create_date")[-20:]
 
         messages = [{
             "role": "system",
-            "content": (
-                "You are Prema AI running inside Odoo 18 Enterprise.\n"
-                "You operate strictly through ORM.\n"
-                "If user requests accounting scan, use available tools.\n"
-                "Available tool:\n"
-                "- scan_chart_of_accounts\n"
-            ),
+            "content": "You are Prema AI running inside Odoo 18 Enterprise. Operate strictly through ORM.",
         }]
 
         for msg in history:
@@ -281,45 +175,46 @@ class PremaAISession(models.Model):
                 "content": msg.content,
             })
 
-        payload = {
-            "model": "gpt-4o-mini",
-            "messages": messages,
-            "tools": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "scan_chart_of_accounts",
-                        "description": "Scan Odoo chart of accounts for issues.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                        },
-                    },
-                }
-            ],
-            "tool_choice": "auto",
-        }
-
         response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            data=json.dumps(payload),
-            timeout=30,
+            "https://api.openai.com/v1/responses",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gpt-4.1-mini",
+                "input": messages,
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "scan_chart_of_accounts",
+                            "description": "Scan Odoo chart of accounts for issues.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {},
+                            },
+                        },
+                    }
+                ],
+                "tool_choice": "auto",
+            },
+            timeout=60,
         )
 
         if response.status_code != 200:
             raise ValueError(response.text)
 
         data = response.json()
-        choice = data["choices"][0]["message"]
+        output = data.get("output", [])
+        if not output:
+            raise ValueError("No output returned from OpenAI.")
 
-        # ---------------------------------------------------
-        # TOOL CALL HANDLING
-        # ---------------------------------------------------
+        message_block = output[0]
 
-        if "tool_calls" in choice:
-            tool_call = choice["tool_calls"][0]
-            tool_name = tool_call["function"]["name"]
+        # Tool call
+        if message_block.get("type") == "tool_call":
+            tool_name = message_block["name"]
 
             tools = self._tool_registry()
             if tool_name not in tools:
@@ -336,7 +231,7 @@ class PremaAISession(models.Model):
             })
 
             assistant_message = self.env["prema.ai.message"].create({
-                "session_id": session.id,
+                "session_id": self.id,
                 "role": "assistant",
                 "content": f"Tool '{tool_name}' executed. {len(result)} findings stored for approval.",
             })
@@ -348,16 +243,16 @@ class PremaAISession(models.Model):
                 "tool_log_id": log.id,
             }
 
-        # ---------------------------------------------------
-        # NORMAL RESPONSE
-        # ---------------------------------------------------
-
-        reply_text = choice.get("content", "")
+        # Normal response
+        text_output = ""
+        for item in message_block.get("content", []):
+            if item.get("type") == "output_text":
+                text_output += item.get("text", "")
 
         assistant_message = self.env["prema.ai.message"].create({
-            "session_id": session.id,
+            "session_id": self.id,
             "role": "assistant",
-            "content": reply_text,
+            "content": text_output,
         })
 
         return {

@@ -6,7 +6,7 @@
         "security/ir.model.access.csv",
         "security/ai_session_rules.xml",
         "views/ai_console_views.xml",
-        'views/ai_tool_log_views.xml',
+        "views/ai_tool_log_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

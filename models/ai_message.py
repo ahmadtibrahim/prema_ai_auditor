@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import models, fields
 
 
 class PremaAIMessage(models.Model):
@@ -32,5 +32,3 @@ class PremaAIMessage(models.Model):
     )
 
     content = fields.Text(required=True)
-
-    # create_date handled automatically by Odoo

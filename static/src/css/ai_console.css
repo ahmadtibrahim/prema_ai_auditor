@@ -15,6 +15,9 @@
     padding: 8px;
     cursor: pointer;
     border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .o_ai_session_item.active {

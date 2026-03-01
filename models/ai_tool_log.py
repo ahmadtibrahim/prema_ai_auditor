@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import fields, models
 from odoo.exceptions import UserError
 
 
@@ -12,12 +12,15 @@ class PremaAIToolLog(models.Model):
     input_payload = fields.Text()
     output_payload = fields.Text()
 
-    status = fields.Selection([
-        ("suggested", "Suggested"),
-        ("approved", "Approved"),
-        ("executed", "Executed"),
-        ("failed", "Failed"),
-    ], default="suggested")
+    status = fields.Selection(
+        [
+            ("suggested", "Suggested"),
+            ("approved", "Approved"),
+            ("executed", "Executed"),
+            ("failed", "Failed"),
+        ],
+        default="suggested",
+    )
 
     def action_approve(self):
         self.write({"status": "approved"})

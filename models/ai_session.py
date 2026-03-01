@@ -2,8 +2,6 @@ from odoo import api, models, fields
 from odoo.exceptions import UserError
 import requests
 import json
-import base64
-import binascii
 
 
 class PremaAISession(models.Model):
@@ -101,6 +99,7 @@ class PremaAISession(models.Model):
 
     @api.model
     def analyze_uploaded_document(self, *args, **kwargs):
+        self.ensure_one()
         session_id = False
         if args:
             first_arg = args[0]
@@ -127,44 +126,31 @@ class PremaAISession(models.Model):
             raise UserError("OpenAI API key not configured.")
 
         attachment = self.env["ir.attachment"].browse(attachment_id)
-        if not attachment or not attachment.datas:
-            raise UserError("Attachment is empty or invalid.")
+        if not attachment:
+            raise UserError("No document uploaded.")
+
+        if not attachment.datas:
+            raise UserError("Empty file.")
 
         if attachment.res_model != "prema.ai.session" or attachment.res_id != session.id:
             raise UserError("Attachment does not belong to this session.")
 
-        if len(attachment.datas) < 50:
-            raise ValueError("Attachment base64 too small.")
+        if isinstance(attachment.datas, bytes):
+            base64_string = attachment.datas.decode("utf-8")
+        else:
+            base64_string = attachment.datas
 
-        file_base64 = (
-            attachment.datas.decode("utf-8")
-            if isinstance(attachment.datas, (bytes, bytearray))
-            else attachment.datas
-        )
-        if not isinstance(file_base64, str):
-            raise UserError("Attachment payload must be a base64 string.")
-        try:
-            base64.b64decode(file_base64, validate=True)
-        except (binascii.Error, ValueError) as exc:
-            raise UserError(f"Attachment base64 is invalid: {exc}")
+        mimetype = attachment.mimetype or "application/octet-stream"
+        file_data = f"data:{mimetype};base64,{base64_string}"
 
-        mimetype = attachment.mimetype or "application/pdf"
-        data_url = f"data:{mimetype};base64,{file_base64}"
-
-        prompt = (
-            "You are an AI assistant extracting invoice data from PDFs. "
-            "Return a compact JSON object with vendor_name, invoice_number, invoice_date, "
-            "subtotal, tax, total, and line_items (an array of {description, quantity, unit_price, amount}). "
-            "Return only valid JSON without additional text."
-        )
         payload = {
             "model": "gpt-4.1-mini",
             "input": [
                 {
                     "role": "user",
                     "content": [
-                        {"type": "input_text", "text": prompt},
-                        {"type": "input_file", "filename": attachment.name, "file_data": data_url},
+                        {"type": "input_file", "file_data": file_data},
+                        {"type": "input_text", "text": "Extract structured invoice data as JSON only."},
                     ],
                 }
             ],
@@ -178,11 +164,13 @@ class PremaAISession(models.Model):
                     "Content-Type": "application/json",
                 },
                 json=payload,
-                timeout=90,
+                timeout=60,
             )
-            response.raise_for_status()
         except requests.RequestException as exc:
             raise UserError(f"OpenAI request failed: {exc}")
+
+        if response.status_code != 200:
+            raise UserError(response.text)
 
         try:
             data = response.json()
@@ -195,7 +183,7 @@ class PremaAISession(models.Model):
                     text_output += item.get("text", "")
 
         if not text_output:
-            raise UserError("OpenAI returned no text output for document analysis.")
+            raise UserError("AI returned empty result.")
 
         parsed_data = None
         if text_output:

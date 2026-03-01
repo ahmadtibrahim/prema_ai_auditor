@@ -1,62 +1,18 @@
-<t t-name="prema_ai_console.AIConsole" owl="1">
-    <div class="o_prema_ai_console">
+<odoo>
+    <!-- Client Action for AI Console -->
+    <record id="action_prema_ai_console" model="ir.actions.client">
+        <field name="name">Prema AI Console</field>
+        <field name="tag">prema_ai_console.main</field>
+    </record>
 
-        <!-- LEFT SIDEBAR -->
-        <div class="ai-sidebar">
+    <!-- Menu items -->
+    <menuitem id="menu_prema_ai_root" name="Prema AI" sequence="10"/>
 
-            <div class="ai-sidebar-header">
-                <button t-on-click="createSession" class="btn btn-primary w-100">
-                    + New Chat
-                </button>
-            </div>
-
-            <div class="ai-session-list">
-                <t t-foreach="state.sessions" t-as="session" t-key="session.id">
-                    <div t-att-class="'ai-session-item ' + (state.currentSessionId == session.id ? 'active' : '')"
-                         t-on-click="() => selectSession(session.id)">
-
-                        <input type="text"
-                               class="ai-session-input"
-                               t-att-value="session.name"
-                               t-on-click.stop=""
-                               t-on-blur="(ev) => renameSession(session.id, ev.target.value)"
-                               t-on-keydown="(ev) => ev.key == 'Enter' ? renameSession(session.id, ev.target.value) : null"/>
-
-                        <span class="ai-delete"
-                              t-on-click.stop="() => deleteSession(session.id)">
-                            🗑
-                        </span>
-                    </div>
-                </t>
-            </div>
-
-        </div>
-
-        <!-- RIGHT CHAT WINDOW -->
-        <div class="ai-chat">
-
-            <div class="ai-messages">
-                <t t-foreach="state.messages" t-as="msg" t-key="msg.id">
-                    <div t-att-class="'ai-message ' + msg.role">
-                        <t t-esc="msg.content"/>
-                    </div>
-                </t>
-            </div>
-
-            <div class="ai-input-bar">
-                <input type="text"
-                       class="form-control"
-                       t-model="state.newMessage"
-                       placeholder="Ask Prema AI..."
-                       t-on-keydown="(ev) => ev.key == 'Enter' ? sendMessage() : null"/>
-
-                <button class="btn btn-primary"
-                        t-on-click="sendMessage">
-                    Send
-                </button>
-            </div>
-
-        </div>
-
-    </div>
-</t>
+    <menuitem
+        id="menu_prema_ai_console"
+        name="AI Console"
+        parent="menu_prema_ai_root"
+        action="action_prema_ai_console"
+        sequence="1"
+    />
+</odoo>

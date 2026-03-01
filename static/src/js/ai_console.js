@@ -9,6 +9,7 @@ class AIConsole extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this.user = useService("user");
 
         this.state = useState({
             sessions: [],
@@ -87,17 +88,21 @@ class AIConsole extends Component {
 
     async createNewSession() {
         try {
-            const createResult = await this.orm.create("prema.ai.session", [{
-                name: "New Chat"
-            }]);
-            const id = Array.isArray(createResult) ? createResult[0] : createResult;
+            const sessionId = await this.orm.create(
+                "prema.ai.session",
+                [{
+                    name: "New Chat",
+                    user_id: this.user.userId,
+                }]
+            );
+
+            this.notification.add("Session created successfully", { type: "success" });
 
             await this.loadSessions();
-            this.state.activeSessionId = id || null;
-            await this.loadMessages();
+            this.state.activeSessionId = sessionId;
         } catch (error) {
-            console.error(error);
-            this.notification.add("Failed to create session", { type: "danger" });
+            console.error("Create session error:", error);
+            this.notification.add("Failed to create session.", { type: "danger" });
         }
     }
 

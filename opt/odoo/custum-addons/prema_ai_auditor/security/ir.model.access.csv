@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_prema_ai_session,prema.ai.session,model_prema_ai_session,base.group_user,1,1,1,1
+access_prema_ai_message,prema.ai.message,model_prema_ai_message,base.group_user,1,1,1,1
+access_prema_ai_tool_log,prema.ai.tool.log,model_prema_ai_tool_log,base.group_user,1,1,1,1

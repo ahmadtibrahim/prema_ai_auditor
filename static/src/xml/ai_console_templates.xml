@@ -70,6 +70,28 @@
                     </button>
                 </div>
 
+                <div class="o_ai_doc_zone mt-3 p-3 border rounded"
+                     t-on-drop="onDrop"
+                     t-on-dragover="onDragOver">
+                    <div class="mb-2"><strong>Upload Document</strong></div>
+                    <input type="file" t-on-change="onFileSelected"/>
+                    <div t-if="state.uploadName" class="mt-2">Selected: <t t-esc="state.uploadName"/></div>
+                    <button t-on-click="analyzeDocument" class="btn btn-outline-primary mt-2">Analyze Document</button>
+                </div>
+
+                <div t-if="state.parsedDocument" class="o_ai_doc_preview mt-3 p-3 border rounded">
+                    <div class="d-flex justify-content-between">
+                        <strong>Document Preview</strong>
+                        <span class="badge text-bg-info"><t t-esc="state.documentStatus || 'analyzed'"/></span>
+                    </div>
+                    <div class="mt-2">Vendor: <t t-esc="state.parsedDocument.vendor_name"/></div>
+                    <div>Date: <t t-esc="state.parsedDocument.bill_date"/></div>
+                    <div>Total: <t t-esc="state.parsedDocument.total_amount"/></div>
+                    <div class="mt-2"><strong>Suggested Action</strong></div>
+                    <div><t t-esc="state.parsedDocument.suggested_action"/></div>
+                    <button t-on-click="createDraftBill" class="btn btn-success mt-2">Create Draft Bill</button>
+                </div>
+
             </div>
 
         </div>

@@ -1,12 +1,14 @@
 {
     "name": "Prema AI Console",
     "version": "18.0.1.0.0",
-    "depends": ["base", "web"],
+    "depends": ["base", "web", "account", "mail"],
     "data": [
         "security/ir.model.access.csv",
         "security/ai_session_rules.xml",
         "views/ai_console_views.xml",
         "views/ai_tool_log_views.xml",
+        "views/ai_document_views.xml",
+        "views/ai_learning_memory_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

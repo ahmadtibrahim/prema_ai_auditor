@@ -1,4 +1,5 @@
 from odoo import models, fields, api
+from odoo.exceptions import UserError
 import requests
 import json
 
@@ -20,6 +21,7 @@ class PremaAISession(models.Model):
         "prema.ai.message",
         "session_id",
     )
+    document_ids = fields.One2many("prema.ai.document", "session_id")
 
     # -------------------------------------------------------
     # TOOL REGISTRY
@@ -72,6 +74,178 @@ class PremaAISession(models.Model):
                 "content": user_message.content,
             },
             "assistant": assistant_reply,
+        }
+
+    def analyze_uploaded_document(self, attachment_id):
+        self.ensure_one()
+
+        attachment = self.env["ir.attachment"].browse(attachment_id)
+        if not attachment.exists():
+            raise UserError("Attachment not found.")
+
+        if not attachment.datas:
+            raise UserError("Attachment content is empty.")
+
+        api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
+        if not api_key:
+            raise UserError("OpenAI API key not configured.")
+
+        vision_prompt = (
+            "Extract a JSON object with keys: vendor_name, bill_date, total_amount, tax_amount, "
+            "line_items (array of {description, quantity, unit_price, amount}), keywords (array), "
+            "document_type (bill/license/insurance/unknown), and suggested_action. "
+            "Return only valid JSON."
+        )
+
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": vision_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{attachment.mimetype or 'application/octet-stream'};base64,{attachment.datas}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            "response_format": {"type": "json_object"},
+        }
+
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                data=json.dumps(payload),
+                timeout=45,
+            )
+            response.raise_for_status()
+            raw_content = response.json()["choices"][0]["message"].get("content", "{}")
+            parsed_data = json.loads(raw_content)
+        except (requests.RequestException, KeyError, json.JSONDecodeError) as error:
+            raise UserError(f"Document analysis failed: {error}")
+
+        document = self.env["prema.ai.document"].create({
+            "name": attachment.name or "Uploaded Document",
+            "session_id": self.id,
+            "attachment_id": attachment.id,
+            "document_type": parsed_data.get("document_type", "unknown"),
+            "ai_summary": json.dumps(parsed_data),
+            "ai_suggested_action": parsed_data.get("suggested_action", ""),
+            "status": "analyzed",
+        })
+
+        self.env["prema.ai.tool.log"].create({
+            "user_id": self.env.user.id,
+            "tool_name": "analyze_document",
+            "input_payload": json.dumps({"attachment_id": attachment.id}),
+            "output_payload": json.dumps(parsed_data),
+            "status": "suggested",
+            "session_id": self.id,
+        })
+
+        return {
+            "document_id": document.id,
+            "parsed_data": parsed_data,
+            "status": document.status,
+        }
+
+    def create_draft_bill_from_ai(self, parsed_data, attachment_id):
+        self.ensure_one()
+        partner_name = (parsed_data or {}).get("vendor_name")
+        if not partner_name:
+            raise UserError("Vendor name is required to create a draft bill.")
+
+        partner = self.env["res.partner"].search([("name", "=", partner_name)], limit=1)
+        if not partner:
+            partner = self.env["res.partner"].create({"name": partner_name, "supplier_rank": 1})
+
+        keywords = ", ".join((parsed_data or {}).get("keywords", []))
+        suggested_account = self.env["prema.ai.learning.engine"].suggest_account(partner.id, keywords)
+        if not suggested_account:
+            suggested_account = self.env["account.account"].search(
+                [
+                    ("company_id", "=", self.env.company.id),
+                    ("account_type", "in", ["expense", "expense_direct_cost"]),
+                    ("deprecated", "=", False),
+                ],
+                limit=1,
+            )
+        if not suggested_account:
+            raise UserError("No suitable expense account found for draft bill line.")
+
+        line_items = (parsed_data or {}).get("line_items") or []
+        if not line_items:
+            line_items = [{
+                "description": "AI Suggested Expense",
+                "quantity": 1.0,
+                "unit_price": (parsed_data or {}).get("total_amount") or 0.0,
+                "amount": (parsed_data or {}).get("total_amount") or 0.0,
+            }]
+
+        invoice_lines = []
+        for item in line_items:
+            quantity = item.get("quantity") or 1.0
+            price_unit = item.get("unit_price")
+            if price_unit is None:
+                amount = item.get("amount") or 0.0
+                price_unit = amount / quantity if quantity else amount
+            invoice_lines.append((0, 0, {
+                "name": item.get("description") or "AI Line",
+                "quantity": quantity,
+                "price_unit": price_unit,
+                "account_id": suggested_account.id,
+            }))
+
+        bill_vals = {
+            "move_type": "in_invoice",
+            "partner_id": partner.id,
+            "invoice_date": (parsed_data or {}).get("bill_date") or fields.Date.context_today(self),
+            "invoice_line_ids": invoice_lines,
+            "created_from_ai": True,
+            "ai_session_id": self.id,
+            "ai_detected_keywords": keywords,
+        }
+        bill = self.env["account.move"].create(bill_vals)
+
+        attachment = self.env["ir.attachment"].browse(attachment_id)
+        if attachment.exists():
+            attachment.write({
+                "res_model": "account.move",
+                "res_id": bill.id,
+            })
+
+            document = self.env["prema.ai.document"].search(
+                [
+                    ("session_id", "=", self.id),
+                    ("attachment_id", "=", attachment.id),
+                ],
+                limit=1,
+            )
+            if document:
+                document.write({"status": "processed"})
+
+        self.env["prema.ai.tool.log"].create({
+            "user_id": self.env.user.id,
+            "tool_name": "create_draft_bill",
+            "input_payload": json.dumps({"attachment_id": attachment_id, "parsed_data": parsed_data}),
+            "output_payload": json.dumps({"bill_id": bill.id}),
+            "status": "executed",
+            "session_id": self.id,
+            "bill_id": bill.id,
+        })
+
+        return {
+            "bill_id": bill.id,
+            "bill_name": bill.name,
+            "partner_id": partner.id,
         }
 
     # -------------------------------------------------------

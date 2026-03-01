@@ -3,6 +3,8 @@ from odoo.exceptions import UserError
 import requests
 import json
 
+OPENAI_API_KEY_PARAM = "openai.api_key"
+
 
 class PremaAISession(models.Model):
     _name = "prema.ai.session"
@@ -107,10 +109,10 @@ class PremaAISession(models.Model):
             "user_id": self.env.user.id,
         })
 
-        api_key = session.env["ir.config_parameter"].sudo().get_param("openai.api_key")
+        api_key = session.env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)
         if not api_key:
             from odoo.exceptions import UserError
-            raise UserError("OpenAI API key is not configured in System Parameters (openai.api_key)")
+            raise UserError(f"OpenAI API key is not configured in System Parameters ({OPENAI_API_KEY_PARAM})")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -315,10 +317,10 @@ class PremaAISession(models.Model):
     def _call_openai(self):
         self.ensure_one()
 
-        api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
+        api_key = self.env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)
         if not api_key:
             from odoo.exceptions import UserError
-            raise UserError("OpenAI API key is not configured in System Parameters (openai.api_key)")
+            raise UserError(f"OpenAI API key is not configured in System Parameters ({OPENAI_API_KEY_PARAM})")
 
         headers = {
             "Authorization": f"Bearer {api_key}",

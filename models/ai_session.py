@@ -123,7 +123,13 @@ class PremaAISession(models.Model):
 
         api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
         if not api_key:
-            raise UserError("OpenAI API key not configured.")
+            from odoo.exceptions import UserError
+            raise UserError("OpenAI API key is not configured in System Parameters (openai.api_key)")
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
 
         attachment = self.env["ir.attachment"].browse(attachment_id)
         if not attachment:
@@ -159,10 +165,7 @@ class PremaAISession(models.Model):
         try:
             response = requests.post(
                 "https://api.openai.com/v1/responses",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
+                headers=headers,
                 json=payload,
                 timeout=60,
             )
@@ -332,7 +335,13 @@ class PremaAISession(models.Model):
 
         api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key")
         if not api_key:
-            raise ValueError("OpenAI API key not configured.")
+            from odoo.exceptions import UserError
+            raise UserError("OpenAI API key is not configured in System Parameters (openai.api_key)")
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
 
         history = self.message_ids.sorted("create_date")[-20:]
 
@@ -350,10 +359,7 @@ class PremaAISession(models.Model):
         try:
             response = requests.post(
                 "https://api.openai.com/v1/responses",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
+                headers=headers,
                 json={
                     "model": "gpt-4.1-mini",
                     "input": messages,

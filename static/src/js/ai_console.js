@@ -129,6 +129,9 @@ class AIConsole extends Component {
 
         } catch (error) {
             console.error("Delete error:", error);
+            this.notification.add("Unable to delete session", {
+                type: "danger",
+            });
         }
     }
 
@@ -211,7 +214,21 @@ class AIConsole extends Component {
             { attachment_id: attachmentId }
         );
 
-        this.state.parsedDocument = result.parsed_data;
+        let parsedDocument = result.parsed_data;
+        if (typeof parsedDocument === "string") {
+            try {
+                parsedDocument = JSON.parse(parsedDocument);
+            } catch (_error) {
+                parsedDocument = {
+                    vendor_name: "N/A",
+                    bill_date: "N/A",
+                    total_amount: "N/A",
+                    suggested_action: result.parsed_data,
+                };
+            }
+        }
+
+        this.state.parsedDocument = parsedDocument;
         this.state.analyzedAttachmentId = attachmentId;
         this.state.documentStatus = result.status;
     }

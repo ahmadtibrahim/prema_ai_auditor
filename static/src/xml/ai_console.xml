@@ -1,87 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
+<t t-name="prema_ai_console.AIConsole">
 
-    <t t-name="prema_ai_auditor.AIConsole" owl="1">
+<div class="o_ai_layout">
 
-        <div class="o_ai_layout">
+    <!-- ===== SIDEBAR ===== -->
+    <div class="o_ai_sidebar">
 
-            <div class="o_ai_sidebar">
+        <button class="o_ai_new_btn" t-on-click="createNewSession">
+            <i class="fa fa-plus me-2"/> New Chat
+        </button>
 
-                <button type="button"
-                        class="btn btn-primary w-100 mb-2"
-                        t-on-click="createNewSession">
-                    + New Chat
-                </button>
+        <h6>Recent Chats</h6>
 
-                <div class="o_ai_session_list">
+        <t t-if="state.sessions.length === 0">
+            <div style="color:#585b70; font-size:12px; padding:6px;">No chats yet</div>
+        </t>
 
-                    <t t-if="state.sessions and state.sessions.length">
-                        <t t-foreach="state.sessions"
-                           t-as="session"
-                           t-key="session.id">
+        <t t-foreach="state.sessions" t-as="session" t-key="session.id">
+            <div class="o_ai_session_item"
+                 t-att-class="session.id === state.activeSessionId ? 'active' : ''"
+                 t-on-click="() => this.selectSession(session.id, session.name)">
 
-                            <div class="o_ai_session_item"
-                                 t-att-class="session.id === state.activeSessionId ? 'o_ai_session_item active' : 'o_ai_session_item'"
-                                 t-on-click="selectSession(session.id)">
+                <i class="fa fa-comment-o" style="opacity:0.5; font-size:12px;"/>
+                <span class="o_ai_session_name" t-esc="session.name"/>
 
-                                <div class="o_ai_session_name">
-                                    <t t-esc="session.name"/>
-                                </div>
-
-                                <div class="o_ai_session_actions">
-                                    <i class="fa fa-pencil"
-                                       t-on-click.stop="renameSession(session.id)"/>
-                                    <i class="fa fa-trash text-danger"
-                                       t-on-click.stop="deleteSession(session.id)"/>
-                                </div>
-
-                            </div>
-
-                        </t>
-                    </t>
-
-                </div>
-            </div>
-
-            <div class="o_ai_chat_area">
-
-                <div class="o_ai_messages" t-ref="messages">
-
-                    <t t-if="state.messages and state.messages.length">
-                        <t t-foreach="state.messages"
-                           t-as="msg"
-                           t-key="msg.id">
-
-                            <div t-att-class="msg.role === 'user' ? 'o_ai_msg user' : 'o_ai_msg assistant'">
-                                <div class="o_ai_msg_content">
-                                    <t t-esc="msg.content"/>
-                                </div>
-                            </div>
-
-                        </t>
-                    </t>
-
-                </div>
-
-                <div class="o_ai_input_bar">
-
-                    <input type="text"
-                           class="form-control"
-                           placeholder="Type your message..."
-                           t-model="state.input"
-                           t-on-keydown="handleKeyDown"/>
-
-                    <button type="button"
-                            class="btn btn-primary"
-                            t-on-click="sendMessage">
-                        Send
-                    </button>
-
+                <div class="o_ai_session_actions">
+                    <i class="fa fa-pencil"
+                       t-on-click="(ev) => this.renameSession(session.id, ev)"
+                       title="Rename"/>
+                    <i class="fa fa-trash"
+                       t-on-click="(ev) => this.deleteSession(session.id, ev)"
+                       title="Delete"/>
                 </div>
 
             </div>
+        </t>
 
+    </div>
+
+    <!-- ===== CHAT AREA ===== -->
+    <div class="o_ai_chat_area">
+
+        <!-- Header -->
+        <div class="o_ai_header">
+            <i class="fa fa-robot"/>
+            <span>Prema AI</span>
+            <small>· Odoo 18 Assistant</small>
         </div>
 
-    </t>
+        <!-- No session selected -->
+        <t t-if="!state.activeSessionId">
+            <div class="o_ai_empty">
+                <i class="fa fa-comments-o"/>
+                <p>Welcome to Prema AI Console</p>
+                <small>Create a new chat to get started</small>
+            </div>
+        </t>
 
+        <!-- Active session -->
+        <t t-if="state.activeSessionId">
+
+            <div class="o_ai_messages" t-ref="messages">
+
+                <!-- Hint when chat is empty -->
+                <t t-if="state.messages.length === 0 and !state.isLoading">
+                    <div style="text-align:center; color:#9ca3af; font-size:13px; padding:30px 0;">
+                        <i class="fa fa-magic" style="font-size:32px; color:#c4b5fd; display:block; margin-bottom:12px;"/>
+                        Ask me anything about your Odoo system.<br/>
+                        <span style="color:#c4b5fd; margin-top:8px; display:block;">
+                            "Show unpaid invoices" · "Financial summary" · "Check duplicate bills"<br/>
+                            "Debug my stock module" · "Find errors in account moves"
+                        </span>
+                    </div>
+                </t>
+
+                <!-- Message list -->
+                <t t-foreach="state.messages" t-as="msg" t-key="msg.id or msg_index">
+                    <t t-if="msg.role !== 'system'">
+                        <div t-att-class="'o_ai_msg ' + msg.role">
+                            <div class="o_ai_msg_label">
+                                <t t-if="msg.role === 'user'">You</t>
+                                <t t-else="">Prema AI</t>
+                            </div>
+                            <div class="o_ai_msg_bubble" t-esc="msg.content"/>
+                        </div>
+                    </t>
+                </t>
+
+                <!-- Typing / loading indicator -->
+                <t t-if="state.isLoading">
+                    <div class="o_ai_typing">
+                        <span/><span/><span/>
+                    </div>
+                </t>
+
+                <!-- Inline error message -->
+                <t t-if="state.errorMsg">
+                    <div class="o_ai_error_msg">
+                        <i class="fa fa-exclamation-triangle me-2"/>
+                        <t t-esc="state.errorMsg"/>
+                    </div>
+                </t>
+
+            </div>
+
+            <!-- Input bar -->
+            <div class="o_ai_input_bar">
+                <textarea
+                    placeholder="Ask about invoices, bugs, CRM, accounting... (Shift+Enter for new line)"
+                    t-model="state.input"
+                    t-on-keydown="handleKeyDown"
+                    rows="1"
+                    t-att-disabled="state.isLoading ? true : undefined"
+                />
+                <button class="o_ai_send_btn"
+                        t-on-click="sendMessage"
+                        t-att-disabled="state.isLoading or !state.input ? true : undefined">
+                    <i t-att-class="state.isLoading ? 'fa fa-spinner fa-spin' : 'fa fa-paper-plane'"/>
+                </button>
+            </div>
+
+        </t>
+
+    </div>
+
+</div>
+
+</t>
 </templates>

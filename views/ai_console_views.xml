@@ -1,13 +1,18 @@
 <odoo>
-    <!-- Client Action for AI Console -->
+    <!-- Client Action -->
     <record id="action_prema_ai_console" model="ir.actions.client">
         <field name="name">Prema AI Console</field>
         <field name="tag">prema_ai_console</field>
     </record>
 
-    <!-- Menu items -->
-    <menuitem id="menu_prema_ai_root" name="Prema AI" sequence="10"/>
+    <!-- Top-level menu -->
+    <menuitem
+        id="menu_prema_ai_root"
+        name="Prema AI"
+        sequence="10"
+    />
 
+    <!-- Sub menu -->
     <menuitem
         id="menu_prema_ai_console"
         name="AI Console"

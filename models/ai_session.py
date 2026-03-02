@@ -1,277 +1,613 @@
-# File: prema_ai_auditor/models/ai_session.py
-# NOTE: replace existing content with this entire file.
-from odoo import api, fields, models
-from odoo.exceptions import UserError
+import json
+import logging
 import requests
 
+from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
+
+OPENAI_API_KEY_PARAM = "openai.api_key"
+
+SYSTEM_PROMPT = """You are an intelligent Odoo 18 ERP assistant and system debugger with full access to this company's database and Odoo environment.
+
+You help with:
+- Accounting: invoices, bills, payments, reconciliation, journal entries
+- CRM: leads, opportunities, pipeline analysis, forecasting
+- Inventory & stock management
+- Sales & purchase orders
+- HR & payroll
+- Bug diagnosis & fixing: finding errors in records, misconfigured fields, broken workflows
+- System introspection: installed modules, model fields, configuration parameters
+- Data cleanup: duplicate records, orphaned entries, inconsistent data
+
+Available tools:
+- search_records: search any Odoo model
+- get_model_fields: inspect fields of any model
+- get_installed_modules: list all installed Odoo modules
+- get_system_config: read system configuration parameters
+- get_ir_config_param: read a specific ir.config.parameter
+- set_ir_config_param: write a system parameter
+- execute_domain_count: count records matching a domain
+- check_duplicate_bills: find duplicate vendor bills
+- financial_summary: revenue/expense/net overview
+- crm_pipeline_analysis: pipeline by stage
+- revenue_forecast: weighted CRM forecast
+- create_record: create a record (requires confirmation)
+- update_record: update a record (requires confirmation)
+- delete_record: delete a record (requires confirmation)
+- run_python_safe: run read-only Python expressions for debugging (no writes)
+
+Behavior rules:
+- ALWAYS ask for explicit user confirmation before creating, updating, or deleting records.
+- For debugging questions, use get_model_fields and search_records to investigate before answering.
+- Format financial figures with 2 decimal places.
+- If unsure of a model name, use search_records on 'ir.model' with [['model','ilike','keyword']].
+- Be concise, technical, and business-focused.
+- If a tool returns an error, diagnose it and suggest a fix.
+"""
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_records",
+            "description": "Search and read records from any Odoo model.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "e.g. 'account.move', 'res.partner'"},
+                    "domain": {"type": "array", "description": "Odoo domain e.g. [['state','=','posted']]", "items": {}},
+                    "fields": {"type": "array", "description": "Field names to return", "items": {"type": "string"}},
+                    "limit": {"type": "integer", "description": "Max records, default 50"},
+                    "order": {"type": "string", "description": "Sort order e.g. 'create_date desc'"},
+                },
+                "required": ["model"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_model_fields",
+            "description": "Get all fields and their types/descriptions for a given Odoo model. Useful for debugging and understanding data structure.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Odoo model name e.g. 'account.move'"},
+                    "filter_type": {"type": "string", "description": "Optional: filter by field type e.g. 'many2one', 'char', 'monetary'"},
+                },
+                "required": ["model"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_installed_modules",
+            "description": "List all installed Odoo modules. Useful for checking what's available on the system.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filter_name": {"type": "string", "description": "Optional: filter by module name keyword"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_system_config",
+            "description": "Read system configuration parameters (ir.config_parameter). Useful for checking API keys, feature flags, etc.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "search": {"type": "string", "description": "Optional keyword to filter parameter keys"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_ir_config_param",
+            "description": "Read a single system parameter by exact key.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "The parameter key e.g. 'web.base.url'"},
+                },
+                "required": ["key"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_ir_config_param",
+            "description": "Write a system configuration parameter. Requires confirmation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string"},
+                    "value": {"type": "string"},
+                    "confirmed": {"type": "boolean"},
+                },
+                "required": ["key", "value"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "execute_domain_count",
+            "description": "Count records in a model matching a domain. Fast way to check data without fetching all records.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string"},
+                    "domain": {"type": "array", "items": {}},
+                },
+                "required": ["model"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_duplicate_bills",
+            "description": "Scan all posted vendor bills and return duplicates sharing the same reference and partner.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "financial_summary",
+            "description": "Total revenue, expenses, and net profit from all posted moves.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "crm_pipeline_analysis",
+            "description": "Opportunities count and expected revenue per CRM stage.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "revenue_forecast",
+            "description": "Weighted revenue forecast from open opportunities.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_record",
+            "description": "Create a new Odoo record. Requires confirmed=true.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string"},
+                    "values": {"type": "object"},
+                    "confirmed": {"type": "boolean"},
+                },
+                "required": ["model", "values"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_record",
+            "description": "Update an existing Odoo record. Requires confirmed=true.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string"},
+                    "record_id": {"type": "integer"},
+                    "values": {"type": "object"},
+                    "confirmed": {"type": "boolean"},
+                },
+                "required": ["model", "record_id", "values"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_record",
+            "description": "Delete an Odoo record. Requires confirmed=true.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string"},
+                    "record_id": {"type": "integer"},
+                    "confirmed": {"type": "boolean"},
+                },
+                "required": ["model", "record_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_python_safe",
+            "description": "Run a read-only Python expression in Odoo context for debugging. Can access self.env. No writes allowed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {
+                        "type": "string",
+                        "description": "A Python expression to evaluate, e.g. \"self.env['account.move'].search_count([('state','=','draft')])\"",
+                    },
+                },
+                "required": ["expression"],
+            },
+        },
+    },
+]
+
+
 class PremaAISession(models.Model):
-    """
-    Conversation model for the Prema AI assistant.  Each session stores the user who
-    owns it, a name (for display) and related messages.  There is no document
-    analysis here; instead the assistant uses the OpenAI responses API with
-    GPT‑5 mini:contentReference[oaicite:5]{index=5} to answer questions and optionally call tools.
-    """
-    _name = 'prema.ai.session'
-    _description = 'Prema AI Session'
+    _name = "prema.ai.session"
+    _description = "Prema AI Session"
+    _order = "create_date desc"
 
-    name = fields.Char(string='Session Name', default='AI Chat')
-    user_id = fields.Many2one('res.users', default=lambda self: self.env.user, ondelete='cascade')
-    message_ids = fields.One2many('prema.ai.message', 'session_id', string='Messages', order='create_date asc')
+    name = fields.Char(default="New Chat")
+    user_id = fields.Many2one("res.users", default=lambda self: self.env.user)
+    message_ids = fields.One2many("prema.ai.message", "session_id")
 
     # -------------------------------------------------------------------------
-    # Session management (model methods)
+    # Public API (called from JS)
     # -------------------------------------------------------------------------
+
     @api.model
     def list_sessions(self):
-        """Return all sessions for the current user (id and name)."""
-        sessions = self.search([('user_id', '=', self.env.user.id)], order='create_date desc')
-        return sessions.read(['id', 'name'])
-
-    @api.model
-    def create(self, vals):
-        """
-        Override create to ensure user_id is set if not provided.  This method is
-        still model‑level so it can be called via RPC with args = [ {vals} ].
-        """
-        if 'user_id' not in vals:
-            vals['user_id'] = self.env.user.id
-        return super().create(vals)
+        sessions = self.search([("user_id", "=", self.env.user.id)], order="create_date desc")
+        return sessions.read(["id", "name"])
 
     @api.model
     def rename_session(self, session_id, new_name):
-        """
-        Rename a session.  Receives the record id and new name as separate
-        positional arguments (RPC passes id first).  Use @api.model to allow
-        calling without record IDs in the first argument.
-        """
         session = self.browse(session_id)
-        if not session.exists():
-            raise UserError('Session not found')
+        session.ensure_one()
         session.name = new_name
         return True
 
     @api.model
     def delete_session(self, session_id):
-        """Delete a session and all its messages."""
         session = self.browse(session_id)
-        if not session.exists():
-            return False
+        session.ensure_one()
         session.unlink()
         return True
 
-    # -------------------------------------------------------------------------
-    # Messaging API (record method)
-    # -------------------------------------------------------------------------
-    def send_message(self, message):
-        """
-        Send a user message to the assistant.  This method is called on a
-        session record via RPC (ids first).  It creates a user message,
-        calls OpenAI with full conversation context, stores the assistant
-        response and returns the text to the frontend.
-        """
-        self.ensure_one()
-        if not message:
-            return ''
-        # Store user message
-        user_msg = self.env['prema.ai.message'].create({
-            'session_id': self.id,
-            'role': 'user',
-            'content': message,
+    @api.model
+    def send_message(self, session_id, message):
+        session = self.browse(session_id)
+        session.ensure_one()
+
+        if not message or not message.strip():
+            return ""
+
+        self.env["prema.ai.message"].create({
+            "session_id": session.id,
+            "role": "user",
+            "content": message.strip(),
         })
-        # Call OpenAI and get assistant reply
-        assistant_reply = self._call_openai()
-        # Store assistant reply
-        self.env['prema.ai.message'].create({
-            'session_id': self.id,
-            'role': 'assistant',
-            'content': assistant_reply,
+
+        assistant_reply = session._call_openai()
+
+        self.env["prema.ai.message"].create({
+            "session_id": session.id,
+            "role": "assistant",
+            "content": assistant_reply,
         })
+
         return assistant_reply
 
     # -------------------------------------------------------------------------
-    # Internal: OpenAI call and tool registry
+    # Tools
     # -------------------------------------------------------------------------
-    def _call_openai(self):
-        """
-        Use OpenAI Responses API with GPT‑5 mini to generate a reply.  Builds
-        conversation history from `message_ids` and includes a system prompt
-        instructing the model to use tools when appropriate.  Returns the
-        assistant’s text reply.  Note: because GPT‑5 mini supports very long
-        contexts (400k tokens input, 128k output):contentReference[oaicite:6]{index=6}, you can
-        include all messages without truncation.
-        """
-        self.ensure_one()
-        api_key = self.env['ir.config_parameter'].sudo().get_param('openai.api_key')
-        if not api_key:
-            raise UserError('OpenAI API key is missing (set system parameter openai.api_key)')
-        # Build system prompt describing available tools and context
-        system_text = (
-            "You are Prema’s intelligent assistant integrated into Odoo 18. "
-            "You have full ORM access to CRM, Accounting, Sales, Fleet, Helpdesk, "
-            "Expenses, Calendar, Contacts and Documents modules. "
-            "You can search records, create/update/delete entries, detect duplicate "
-            "bills, summarise finances, reconcile transactions, analyse leads and "
-            "provide actionable advice. When necessary you will call one of the "
-            "following tools by name with JSON arguments: \n"
-            "- search_records(model, domain, fields) → list of dicts\n"
-            "- create_record(model, values) → id\n"
-            "- update_record(model, record_id, values) → true\n"
-            "- delete_record(model, record_id) → true\n"
-            "- check_duplicate_bills() → list of duplicate invoices\n"
-            "- financial_summary() → summary dict with total income, expenses and balance\n"
-            "- crm_pipeline_analysis() → dict of leads by stage and probability\n"
-            "- revenue_forecast() → forecasted revenues for the next periods.\n"
-            "Always ask for confirmation before creating, updating or deleting records. "
-            "Respond in English and include helpful reasoning and suggestions."
-        )
-        # Build conversation items.  The responses API expects an array of
-        # objects with role and content.  Each content must be a list of
-        # {type, text} items:contentReference[oaicite:7]{index=7}.  We convert all prior
-        # messages into input_text items.
-        items = []
-        # System prompt first
-        items.append({
-            'role': 'system',
-            'content': [ {'type': 'input_text', 'text': system_text} ],
-        })
-        # Past conversation
-        for msg in self.message_ids:
-            items.append({
-                'role': msg.role,
-                'content': [ {'type': 'input_text', 'text': msg.content} ],
-            })
-        # POST to OpenAI
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-        }
-        payload = {
-            'model': 'gpt-5-mini',
-            'input': items,
-        }
-        try:
-            response = requests.post('https://api.openai.com/v1/responses',
-                                      headers=headers, json=payload, timeout=60)
-            response.raise_for_status()
-            data = response.json()
-            # Extract assistant text
-            return data['output'][0]['content'][0]['text']
-        except Exception as e:
-            return f"[OpenAI error] {e}"
 
-    # -------------------------------------------------------------------------
-    # Tool registry – example implementations
-    # -------------------------------------------------------------------------
     def _tool_registry(self):
-        """
-        Return a mapping of tool names to functions.  Tools are called by the
-        assistant via the responses API.  All functions must accept JSON
-        arguments and return JSON‑serialisable results.
-        """
         return {
-            'search_records': self._tool_search_records,
-            'create_record': self._tool_create_record,
-            'update_record': self._tool_update_record,
-            'delete_record': self._tool_delete_record,
-            'check_duplicate_bills': self._tool_check_duplicate_bills,
-            'financial_summary': self._tool_financial_summary,
-            'crm_pipeline_analysis': self._tool_crm_pipeline_analysis,
-            'revenue_forecast': self._tool_revenue_forecast,
+            "search_records": self._tool_search_records,
+            "get_model_fields": self._tool_get_model_fields,
+            "get_installed_modules": self._tool_get_installed_modules,
+            "get_system_config": self._tool_get_system_config,
+            "get_ir_config_param": self._tool_get_ir_config_param,
+            "set_ir_config_param": self._tool_set_ir_config_param,
+            "execute_domain_count": self._tool_execute_domain_count,
+            "check_duplicate_bills": self._tool_check_duplicate_bills,
+            "financial_summary": self._tool_financial_summary,
+            "crm_pipeline_analysis": self._tool_crm_pipeline_analysis,
+            "revenue_forecast": self._tool_revenue_forecast,
+            "create_record": self._tool_create_record,
+            "update_record": self._tool_update_record,
+            "delete_record": self._tool_delete_record,
+            "run_python_safe": self._tool_run_python_safe,
         }
 
-    # --- basic CRUD tools ---
-    def _tool_search_records(self, model, domain, fields=None):
-        records = self.env[model].search_read(domain, fields)
-        return records
+    def _tool_search_records(self, model, domain=None, fields=None, limit=50, order=None):
+        try:
+            kwargs = {"limit": int(limit) if limit else 50}
+            if order:
+                kwargs["order"] = order
+            return self.env[model].search_read(domain or [], fields or [], **kwargs)
+        except Exception as e:
+            return {"error": str(e)}
 
-    def _tool_create_record(self, model, values):
-        rec = self.env[model].create(values)
-        return rec.id
+    def _tool_get_model_fields(self, model, filter_type=None):
+        try:
+            fields_data = self.env[model].fields_get()
+            result = {}
+            for fname, finfo in fields_data.items():
+                if filter_type and finfo.get("type") != filter_type:
+                    continue
+                result[fname] = {
+                    "type": finfo.get("type"),
+                    "string": finfo.get("string"),
+                    "required": finfo.get("required", False),
+                    "readonly": finfo.get("readonly", False),
+                    "relation": finfo.get("relation"),
+                }
+            return result
+        except Exception as e:
+            return {"error": str(e)}
 
-    def _tool_update_record(self, model, record_id, values):
-        rec = self.env[model].browse(record_id)
-        rec.write(values)
-        return True
+    def _tool_get_installed_modules(self, filter_name=None):
+        try:
+            domain = [("state", "=", "installed")]
+            if filter_name:
+                domain.append(("name", "ilike", filter_name))
+            modules = self.env["ir.module.module"].search_read(
+                domain,
+                ["name", "shortdesc", "installed_version", "author"],
+                order="name asc",
+                limit=200,
+            )
+            return modules
+        except Exception as e:
+            return {"error": str(e)}
 
-    def _tool_delete_record(self, model, record_id):
-        rec = self.env[model].browse(record_id)
-        rec.unlink()
-        return True
+    def _tool_get_system_config(self, search=None):
+        try:
+            domain = []
+            if search:
+                domain.append(("key", "ilike", search))
+            params = self.env["ir.config_parameter"].sudo().search_read(
+                domain, ["key", "value"], limit=100, order="key asc"
+            )
+            return params
+        except Exception as e:
+            return {"error": str(e)}
 
-    # --- business tools ---
+    def _tool_get_ir_config_param(self, key):
+        try:
+            value = self.env["ir.config_parameter"].sudo().get_param(key)
+            return {"key": key, "value": value}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _tool_set_ir_config_param(self, key, value, confirmed=False):
+        if not confirmed:
+            return "⚠️ Confirmation required. Set system parameter '{}' = '{}'. Reply 'yes, confirm' to proceed.".format(key, value)
+        try:
+            self.env["ir.config_parameter"].sudo().set_param(key, value)
+            return {"success": True, "key": key, "value": value}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _tool_execute_domain_count(self, model, domain=None):
+        try:
+            count = self.env[model].search_count(domain or [])
+            return {"model": model, "domain": domain, "count": count}
+        except Exception as e:
+            return {"error": str(e)}
+
     def _tool_check_duplicate_bills(self):
-        """
-        Find potential duplicate vendor bills (same vendor, same amount and date).
-        Returns a list of invoice names.  This uses account.move with type
-        'in_invoice'.
-        """
-        moves = self.env['account.move'].search([('move_type', '=', 'in_invoice')])
-        duplicates = []
-        seen = set()
-        for mv in moves:
-            key = (mv.partner_id.id, mv.amount_total, mv.invoice_date)
-            if key in seen:
-                duplicates.append(mv.name)
-            else:
-                seen.add(key)
-        return duplicates
+        try:
+            grouped = self.env["account.move"].read_group(
+                [("move_type", "=", "in_invoice"), ("state", "!=", "cancel")],
+                ["ref", "partner_id", "id:count"],
+                ["ref", "partner_id"],
+                lazy=False,
+            )
+            duplicates = [
+                {
+                    "partner_id": row["partner_id"][0],
+                    "partner_name": row["partner_id"][1],
+                    "reference": row["ref"],
+                    "count": row["id_count"],
+                }
+                for row in grouped
+                if row.get("id_count", 0) > 1 and row.get("ref") and row.get("partner_id")
+            ]
+            return duplicates if duplicates else "✅ No duplicate bills found."
+        except Exception as e:
+            return {"error": str(e)}
 
     def _tool_financial_summary(self):
-        """Return a simple summary of total income, expenses and balance from journal entries."""
-        income = self.env['account.move'].search([('move_type', '=', 'out_invoice')]).mapped('amount_total')
-        expense = self.env['account.move'].search([('move_type', '=', 'in_invoice')]).mapped('amount_total')
-        return {
-            'total_income': sum(income),
-            'total_expenses': sum(expense),
-            'balance': sum(income) - sum(expense),
-        }
+        try:
+            moves = self.env["account.move"].search([
+                ("state", "=", "posted"),
+                ("move_type", "in", ["out_invoice", "out_refund", "in_invoice", "in_refund"]),
+            ])
+            revenue = sum(
+                moves.filtered(lambda m: m.move_type in ("out_invoice", "out_refund"))
+                .mapped("amount_total_signed")
+            )
+            expense = -sum(
+                moves.filtered(lambda m: m.move_type in ("in_invoice", "in_refund"))
+                .mapped("amount_total_signed")
+            )
+            return {
+                "posted_moves": len(moves),
+                "total_revenue": round(revenue, 2),
+                "total_expense": round(expense, 2),
+                "net_profit": round(revenue - expense, 2),
+            }
+        except Exception as e:
+            return {"error": str(e)}
 
     def _tool_crm_pipeline_analysis(self):
-        """Analyse leads/opportunities and return counts by stage and average probability."""
-        leads = self.env['crm.lead'].search([])
-        stage_counts = {}
-        prob_sum = 0.0
-        for ld in leads:
-            stage = ld.stage_id.name or 'No Stage'
-            stage_counts[stage] = stage_counts.get(stage, 0) + 1
-            prob_sum += ld.probability or 0.0
-        avg_prob = (prob_sum / len(leads)) if leads else 0.0
-        return {
-            'stages': stage_counts,
-            'average_probability': avg_prob,
-        }
+        try:
+            leads = self.env["crm.lead"].search([])
+            breakdown = {}
+            for lead in leads:
+                stage = lead.stage_id.name or "Undefined"
+                breakdown.setdefault(stage, {"count": 0, "expected_revenue": 0.0})
+                breakdown[stage]["count"] += 1
+                breakdown[stage]["expected_revenue"] += lead.expected_revenue or 0.0
+            for s in breakdown:
+                breakdown[s]["expected_revenue"] = round(breakdown[s]["expected_revenue"], 2)
+            return breakdown if breakdown else "No CRM leads found."
+        except Exception as e:
+            return {"error": str(e)}
 
     def _tool_revenue_forecast(self):
-        """
-        Very simple revenue forecast: uses past six months of sales orders (SO).
-        Returns the average monthly revenue and a naive forecast for next month.
-        """
-        today = fields.Date.today()
-        six_months_ago = today - relativedelta(months=6)
-        orders = self.env['sale.order'].search([('date_order', '>=', six_months_ago)])
-        monthly = {}
-        for so in orders:
-            month = so.date_order.strftime('%Y-%m')
-            monthly[month] = monthly.get(month, 0) + so.amount_total
-        if monthly:
-            avg_rev = sum(monthly.values()) / len(monthly)
-            return {
-                'monthly_revenues': monthly,
-                'average_monthly_revenue': avg_rev,
-                'next_month_forecast': avg_rev,
-            }
-        return {
-            'monthly_revenues': {},
-            'average_monthly_revenue': 0.0,
-            'next_month_forecast': 0.0,
-        }
+        try:
+            leads = self.env["crm.lead"].search([("type", "=", "opportunity")])
+            weighted = sum(
+                (lead.expected_revenue or 0.0) * ((lead.probability or 0.0) / 100.0)
+                for lead in leads
+            )
+            return {"opportunity_count": len(leads), "weighted_forecast": round(weighted, 2)}
+        except Exception as e:
+            return {"error": str(e)}
 
-# Message model remains unchanged
-class PremaAIMessage(models.Model):
-    _name = 'prema.ai.message'
-    _description = 'Prema AI Message'
+    def _tool_create_record(self, model, values, confirmed=False):
+        if not confirmed:
+            return "⚠️ Confirmation required. Create '{}' with: {}. Reply 'yes, confirm'.".format(
+                model, json.dumps(values, default=str)
+            )
+        try:
+            record = self.env[model].create(values or {})
+            return {"success": True, "id": record.id}
+        except Exception as e:
+            return {"error": str(e)}
 
-    session_id = fields.Many2one('prema.ai.session', ondelete='cascade')
-    role = fields.Selection([('user', 'User'), ('assistant', 'Assistant')], required=True)
-    content = fields.Text(required=True)
-    create_date = fields.Datetime(default=lambda self: fields.Datetime.now())
+    def _tool_update_record(self, model, record_id, values, confirmed=False):
+        if not confirmed:
+            return "⚠️ Confirmation required. Update record {} in '{}' with: {}. Reply 'yes, confirm'.".format(
+                record_id, model, json.dumps(values, default=str)
+            )
+        try:
+            self.env[model].browse(record_id).write(values or {})
+            return {"success": True}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _tool_delete_record(self, model, record_id, confirmed=False):
+        if not confirmed:
+            return "⚠️ Confirmation required. Delete record {} from '{}'. Reply 'yes, confirm'.".format(
+                record_id, model
+            )
+        try:
+            self.env[model].browse(record_id).unlink()
+            return {"success": True}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _tool_run_python_safe(self, expression):
+        """Read-only Python eval for debugging. Blocks any write keywords."""
+        blocked = ["write(", "create(", "unlink(", "execute(", "sudo(", "cr.execute", "os.", "subprocess", "open(", "eval(", "exec("]
+        for b in blocked:
+            if b in expression:
+                return {"error": "Expression contains blocked keyword: '{}'. Only read-only expressions allowed.".format(b)}
+        try:
+            result = eval(expression, {"self": self, "env": self.env})  # noqa: S307
+            # Serialize result safely
+            if hasattr(result, "read"):
+                return result.read()
+            return json.loads(json.dumps(result, default=str))
+        except Exception as e:
+            return {"error": str(e)}
+
+    # -------------------------------------------------------------------------
+    # OpenAI call with tool loop
+    # -------------------------------------------------------------------------
+
+    def _call_openai(self):
+        self.ensure_one()
+
+        api_key = self.env["ir.config_parameter"].sudo().get_param(OPENAI_API_KEY_PARAM)
+        if not api_key:
+            return (
+                "⚠️ OpenAI API key not configured.\n"
+                "Go to: Settings → Technical → Parameters → System Parameters\n"
+                "Create key: openai.api_key  |  Value: sk-xxxxxxx"
+            )
+
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        for msg in self.message_ids:
+            messages.append({"role": msg.role, "content": msg.content})
+
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        tool_registry = self._tool_registry()
+        MAX_ITERATIONS = 10
+
+        for _i in range(MAX_ITERATIONS):
+            try:
+                response = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    json={
+                        "model": "gpt-4o-mini",
+                        "messages": messages,
+                        "tools": TOOLS,
+                        "tool_choice": "auto",
+                        "max_tokens": 2000,
+                        "temperature": 0.2,
+                    },
+                    timeout=60,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+            except requests.exceptions.Timeout:
+                return "⚠️ Request timed out (60s). Please try again."
+            except requests.exceptions.HTTPError:
+                try:
+                    err = response.json().get("error", {}).get("message", response.text)
+                except Exception:
+                    err = response.text
+                return f"⚠️ OpenAI API error: {err}"
+            except Exception as e:
+                return f"⚠️ Unexpected error: {str(e)}"
+
+            choice = data["choices"][0]
+            assistant_msg = choice["message"]
+            messages.append(assistant_msg)
+
+            if choice.get("finish_reason") == "stop" or not assistant_msg.get("tool_calls"):
+                return assistant_msg.get("content") or "✅ Done."
+
+            for tool_call in assistant_msg.get("tool_calls", []):
+                tool_name = tool_call["function"]["name"]
+                try:
+                    tool_args = json.loads(tool_call["function"]["arguments"])
+                except json.JSONDecodeError:
+                    tool_args = {}
+
+                tool_fn = tool_registry.get(tool_name)
+                if tool_fn:
+                    try:
+                        tool_result = tool_fn(**tool_args)
+                    except Exception as e:
+                        tool_result = {"error": f"Tool '{tool_name}' failed: {str(e)}"}
+                else:
+                    tool_result = {"error": f"Unknown tool: '{tool_name}'"}
+
+                _logger.info("Prema AI tool '%s' result: %s", tool_name, str(tool_result)[:200])
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call["id"],
+                    "content": json.dumps(tool_result, default=str),
+                })
+
+        return "⚠️ Max iterations reached. Try a more specific question."

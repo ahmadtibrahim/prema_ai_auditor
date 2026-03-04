@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_prema_ai_session,prema.ai.session,model_prema_ai_session,base.group_user,1,1,1,1
-access_prema_ai_message,prema.ai.message,model_prema_ai_message,base.group_user,1,1,1,1
-access_prema_ai_attachment,prema.ai.attachment,model_prema_ai_attachment,base.group_user,1,1,1,1
+access_prema_ai_session,prema.ai.session,model_prema_ai_session,,1,1,1,1
+access_prema_ai_session_message,prema.ai.session.message,model_prema_ai_session_message,,1,1,1,1
+access_prema_ai_task_queue,prema.ai.task.queue,model_prema_ai_task_queue,,1,1,1,1
+access_prema_ai_audit_log,prema.ai.audit.log,model_prema_ai_audit_log,,1,1,1,0

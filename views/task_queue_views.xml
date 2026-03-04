@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_prema_task_list" model="ir.ui.view">
+        <field name="name">prema.ai.task.queue.list</field>
+        <field name="model">prema.ai.task.queue</field>
+        <field name="arch" type="xml">
+            <list string="AI Tasks"
+                  decoration-warning="state=='pending'"
+                  decoration-success="state=='done'"
+                  decoration-danger="state in ['failed']"
+                  decoration-muted="state=='rejected'">
+                <field name="name"/>
+                <field name="action_type"/>
+                <field name="state"/>
+                <field name="user_id"/>
+                <field name="result_summary"/>
+                <field name="create_date"/>
+                <button name="action_approve" string="✅ Approve" type="object"
+                        invisible="state != 'pending'" class="btn-success btn-sm"/>
+                <button name="action_reject" string="❌ Reject" type="object"
+                        invisible="state != 'pending'" class="btn-danger btn-sm"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_prema_task_form" model="ir.ui.view">
+        <field name="name">prema.ai.task.queue.form</field>
+        <field name="model">prema.ai.task.queue</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_approve" string="✅ Approve &amp; Execute"
+                            type="object" class="btn-primary"
+                            invisible="state != 'pending'"/>
+                    <button name="action_reject" string="❌ Reject"
+                            type="object" invisible="state != 'pending'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,approved,executing,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="action_type"/>
+                        <field name="user_id"/>
+                    </group>
+                    <notebook>
+                        <page string="Preview">
+                            <field name="preview_html" widget="html" nolabel="1"/>
+                        </page>
+                        <page string="Result" invisible="state not in ['done','failed']">
+                            <field name="result_summary"/>
+                            <field name="error_message"/>
+                            <field name="result"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="param_prema_ai_api_key" model="ir.config_parameter">
+        <field name="key">prema_ai.api_key</field>
+        <field name="value">REPLACE_WITH_YOUR_ANTHROPIC_API_KEY</field>
+    </record>
+</odoo>

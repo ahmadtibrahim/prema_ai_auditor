@@ -6,29 +6,11 @@ class PremaAIMessage(models.Model):
     _description = "Prema AI Message"
     _order = "create_date asc"
 
-    session_id = fields.Many2one(
-        "prema.ai.session",
-        required=True,
-        ondelete="cascade",
-        index=True,
-    )
-
-    user_id = fields.Many2one(
-        "res.users",
-        related="session_id.user_id",
-        store=True,
-        index=True,
-        readonly=True,
-    )
-
-    role = fields.Selection(
-        [
-            ("system", "System"),
-            ("user", "User"),
-            ("assistant", "Assistant"),
-        ],
-        required=True,
-        index=True,
-    )
-
+    session_id = fields.Many2one("prema.ai.session", required=True, ondelete="cascade", index=True)
+    user_id = fields.Many2one("res.users", related="session_id.user_id", store=True, readonly=True)
+    role = fields.Selection([
+        ("system", "System"),
+        ("user", "User"),
+        ("assistant", "Assistant"),
+    ], required=True, index=True)
     content = fields.Text(required=True)

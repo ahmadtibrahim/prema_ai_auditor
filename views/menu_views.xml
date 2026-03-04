@@ -1,0 +1,14 @@
+<odoo>
+    <record id="action_ai_console" model="ir.actions.client">
+        <field name="name">AI Console</field>
+        <field name="tag">prema_ai_console</field>
+    </record>
+    <record id="action_audit_dashboard" model="ir.actions.client">
+        <field name="name">Audit Dashboard</field>
+        <field name="tag">prema_audit_dashboard</field>
+    </record>
+
+    <menuitem id="menu_prema_root" name="Prema AI" sequence="5"/>
+    <menuitem id="menu_ai_console" name="AI Console" parent="menu_prema_root" action="action_ai_console" sequence="1"/>
+    <menuitem id="menu_audit_dashboard" name="Audit Scanner" parent="menu_prema_root" action="action_audit_dashboard" sequence="2"/>
+</odoo>

@@ -1,0 +1,15 @@
+<odoo>
+    <record id="view_fix_log_list" model="ir.ui.view">
+        <field name="name">prema.audit.fix.log.list</field>
+        <field name="model">prema.audit.fix.log</field>
+        <field name="arch" type="xml">
+            <list string="Fix Log" create="false" delete="false" edit="false">
+                <field name="create_date"/>
+                <field name="user_id"/>
+                <field name="issue_id"/>
+                <field name="approved" widget="boolean"/>
+                <field name="result"/>
+            </list>
+        </field>
+    </record>
+</odoo>

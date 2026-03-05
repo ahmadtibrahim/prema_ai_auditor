@@ -1,4 +1,3 @@
-/** File: /opt/odoo/custum-addons/prema_ai_auditor/static/src/js/ai_console.js */
 /** @odoo-module **/
 
 import { Component, useState, useRef, onMounted, onPatched } from "@odoo/owl";
@@ -14,10 +13,11 @@ class AiConsole extends Component {
 
   setup() {
     this.notification = useService("notification");
+
     this.state = useState({
       sessionId: null,
-      messages: [], // {key, type:'msg'|'task', role?, content?, task_id?, state?, preview_html?, result_url?, result_summary?}
-      attachments: [], // {id, name}
+      messages: [],
+      attachments: [],
       loading: false,
     });
 
@@ -29,7 +29,9 @@ class AiConsole extends Component {
     onPatched(() => this._scrollBottom());
   }
 
-  // ── Init ─────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────
+  // Init Session
+  // ─────────────────────────────────────────
 
   async _initSession() {
     try {
@@ -57,9 +59,9 @@ class AiConsole extends Component {
             "📄  Process invoice PDFs → create vendor bills\n" +
             "📊  Analyze accounting, CRM, fleet & inventory\n" +
             "🔍  Search & audit your entire Odoo system\n" +
-            "✏️   Create records, update data, schedule meetings\n\n" +
+            "✏️  Create records, update data, schedule meetings\n\n" +
             "Just tell me what you need. Examples:\n" +
-            '• "Find all duplicate documents"\n' +
+            "• Find all duplicate documents\n" +
             '• "Put all driver files into a folder called Driver Packets"\n' +
             '• "Show me overdue invoices"\n' +
             "• Upload a PDF invoice and I'll create the vendor bill",
@@ -70,7 +72,9 @@ class AiConsole extends Component {
     }
   }
 
-  // ── Send Message ──────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────
+  // Send Message
+  // ─────────────────────────────────────────
 
   async send() {
     const input = this.msgInput.el;
@@ -80,11 +84,11 @@ class AiConsole extends Component {
     if (this.state.loading) return;
 
     const attIds = this.state.attachments.map((a) => a.id);
+
     const displayText =
       text ||
       `[Uploaded: ${this.state.attachments.map((a) => a.name).join(", ")}]`;
 
-    // Show user bubble
     this.state.messages.push({
       key: key(),
       type: "msg",
@@ -103,7 +107,6 @@ class AiConsole extends Component {
         attachment_ids: attIds,
       });
 
-      // AI response text
       if (res.response) {
         this.state.messages.push({
           key: key(),
@@ -113,7 +116,6 @@ class AiConsole extends Component {
         });
       }
 
-      // Task preview cards
       for (const t of res.pending_tasks || []) {
         this.state.messages.push({
           key: key(),
@@ -138,13 +140,17 @@ class AiConsole extends Component {
     }
   }
 
-  // ── Task Approval ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────
+  // Task Approval
+  // ─────────────────────────────────────────
 
   async approveTask(msg) {
     msg.state = "executing";
 
     try {
-      const res = await rpc("/prema_ai/task/approve", { task_id: msg.task_id });
+      const res = await rpc("/prema_ai/task/approve", {
+        task_id: msg.task_id,
+      });
 
       msg.state = res.state || "done";
       msg.result_url = res.result_url || null;
@@ -163,6 +169,7 @@ class AiConsole extends Component {
     } catch (e) {
       msg.state = "failed";
       msg.result_summary = e.message;
+
       this.notification.add("Execution error: " + e.message, {
         type: "danger",
       });
@@ -171,15 +178,21 @@ class AiConsole extends Component {
 
   async rejectTask(msg) {
     try {
-      await rpc("/prema_ai/task/reject", { task_id: msg.task_id });
+      await rpc("/prema_ai/task/reject", {
+        task_id: msg.task_id,
+      });
+
       msg.state = "rejected";
+
       this.notification.add("Task rejected.", { type: "info" });
     } catch (e) {
       console.error(e);
     }
   }
 
-  // ── File Upload ────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────
+  // File Upload
+  // ─────────────────────────────────────────
 
   openFilePicker() {
     this.fileInput.el.click();
@@ -227,7 +240,9 @@ class AiConsole extends Component {
     );
   }
 
-  // ── UX ────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────
+  // UX
+  // ─────────────────────────────────────────
 
   onKey(ev) {
     if (ev.key === "Enter" && !ev.shiftKey) {
@@ -236,12 +251,14 @@ class AiConsole extends Component {
     }
 
     const ta = ev.target;
+
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 140) + "px";
   }
 
   _scrollBottom() {
     const el = this.msgContainer.el;
+
     if (el) {
       el.scrollTop = el.scrollHeight;
     }

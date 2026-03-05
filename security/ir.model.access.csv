@@ -3,3 +3,9 @@ access_prema_ai_session,prema.ai.session,model_prema_ai_session,,1,1,1,1
 access_prema_ai_session_message,prema.ai.session.message,model_prema_ai_session_message,,1,1,1,1
 access_prema_ai_task_queue,prema.ai.task.queue,model_prema_ai_task_queue,,1,1,1,1
 access_prema_ai_audit_log,prema.ai.audit.log,model_prema_ai_audit_log,,1,1,1,0
+access_prema_ai_message,prema.ai.message,model_prema_ai_message,,1,1,1,1
+access_prema_ai_attachment,prema.ai.attachment,model_prema_ai_attachment,,1,1,1,1
+access_prema_ai_correction,prema.ai.correction,model_prema_ai_correction,,1,1,1,1
+access_prema_audit_scan,prema.audit.scan,model_prema_audit_scan,,1,1,1,1
+access_prema_audit_issue,prema.audit.issue,model_prema_audit_issue,,1,1,1,1
+access_prema_audit_fix_log,prema.audit.fix.log,model_prema_audit_fix_log,,1,1,1,0

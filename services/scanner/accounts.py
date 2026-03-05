@@ -3,8 +3,6 @@
 
 def scan(env):
     issues = []
-
-    # 1. Duplicate account codes
     accounts = env["account.account"].search_read([], ["id", "code", "name", "company_id"])
     seen = {}
     for acc in accounts:
@@ -16,8 +14,6 @@ def scan(env):
                 "affected_model": "account.account", "affected_ids": [acc["id"], seen[key]], "fix_action": None})
         else:
             seen[key] = acc["id"]
-
-    # 2. AR/AP accounts in wrong journal types
     try:
         lines = env["account.move.line"].search_read(
             [("account_id.account_type", "in", ["asset_receivable", "liability_payable"]),
@@ -32,5 +28,4 @@ def scan(env):
                 "affected_model": "account.move.line", "affected_ids": [line["id"]], "fix_action": None})
     except Exception:
         pass
-
     return issues

@@ -1,5 +1,4 @@
 """
-File: /opt/odoo/custum-addons/prema_ai_auditor/controllers/ai_controller.py
 Prema AI HTTP Controller.
 All JSON-RPC endpoints consumed by the OWL frontend.
 """
@@ -282,13 +281,8 @@ class PremaAiController(http.Controller):
                 'https://api.anthropic.com/v1/messages',
                 headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01',
                          'content-type': 'application/json'},
-                json={
-                    # ✅ SWITCHED TO HAIKU
-                    'model': 'claude-3-haiku-20240307',
-                    'max_tokens': 2000,
-                    'system': system,
-                    'messages': messages
-                },
+                json={'model': 'claude-opus-4-6', 'max_tokens': 2000,
+                      'system': system, 'messages': messages},
                 timeout=60,
             )
             resp.raise_for_status()

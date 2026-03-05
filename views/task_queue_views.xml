@@ -15,9 +15,9 @@
                 <field name="user_id"/>
                 <field name="result_summary"/>
                 <field name="create_date"/>
-                <button name="action_approve" string="✅ Approve" type="object"
+                <button name="action_approve" string="Approve" type="object"
                         invisible="state != 'pending'" class="btn-success btn-sm"/>
-                <button name="action_reject" string="❌ Reject" type="object"
+                <button name="action_reject" string="Reject" type="object"
                         invisible="state != 'pending'" class="btn-danger btn-sm"/>
             </list>
         </field>
@@ -29,10 +29,10 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_approve" string="✅ Approve &amp; Execute"
+                    <button name="action_approve" string="Approve and Execute"
                             type="object" class="btn-primary"
                             invisible="state != 'pending'"/>
-                    <button name="action_reject" string="❌ Reject"
+                    <button name="action_reject" string="Reject"
                             type="object" invisible="state != 'pending'"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="pending,approved,executing,done"/>
@@ -50,7 +50,6 @@
                         <page string="Result" invisible="state not in ['done','failed']">
                             <field name="result_summary"/>
                             <field name="error_message"/>
-                            <field name="result"/>
                         </page>
                     </notebook>
                 </sheet>

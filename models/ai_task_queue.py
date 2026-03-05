@@ -7,10 +7,6 @@ _logger = logging.getLogger(__name__)
 
 
 class PremaAiTaskQueue(models.Model):
-    """
-    Pending AI actions awaiting user approval.
-    Preview → Approve → Execute (never skipped).
-    """
     _name = 'prema.ai.task.queue'
     _description = 'Prema AI Task Queue'
     _order = 'create_date desc'

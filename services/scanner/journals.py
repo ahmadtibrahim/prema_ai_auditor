@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 def scan(env):
     issues = []
 
-    # 1. Posted imbalanced entries
     try:
         moves = env["account.move"].search_read([("state", "=", "posted")], ["id", "name", "date"], limit=500)
         for move in moves:
@@ -14,12 +13,11 @@ def scan(env):
             if diff > 0.01:
                 issues.append({"category": "journals", "code": "JNL_IMBALANCED", "risk": "critical",
                     "title": "Imbalanced Entry: {}".format(move["name"]),
-                    "detail": "Entry ID {} is posted but has debit/credit difference of {}.".format(move["id"], diff),
+                    "detail": "Entry ID {} posted but has debit/credit difference of {}.".format(move["id"], diff),
                     "affected_model": "account.move", "affected_ids": [move["id"]], "fix_action": None})
     except Exception:
         pass
 
-    # 2. Draft entries >30 days old
     try:
         cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
         old = env["account.move"].search_read(
@@ -33,7 +31,6 @@ def scan(env):
     except Exception:
         pass
 
-    # 3. Lines with no account
     try:
         orphans = env["account.move.line"].search_read([("account_id", "=", False)], ["id", "move_id"], limit=50)
         for line in orphans:
@@ -44,7 +41,6 @@ def scan(env):
     except Exception:
         pass
 
-    # 4. Empty journal entries
     try:
         empty = env["account.move"].search_read([("line_ids", "=", False), ("state", "=", "draft")], ["id", "name", "date"], limit=50)
         for move in empty:

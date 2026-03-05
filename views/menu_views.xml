@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <menuitem id="menu_prema_ai_root" name="Prema AI" sequence="100"/>
-    <menuitem id="menu_prema_ai_console" name="AI Console" parent="menu_prema_ai_root"
-              action="action_prema_ai_console" sequence="10"/>
-    <menuitem id="menu_prema_ai_tasks" name="Task Queue" parent="menu_prema_ai_root"
-              action="action_prema_ai_task_queue" sequence="20"/>
+
+    <menuitem id="menu_prema_ai_console"
+              name="AI Console"
+              parent="menu_prema_ai_root"
+              action="action_prema_ai_console"
+              sequence="10"/>
+
+    <menuitem id="menu_prema_ai_tasks"
+              name="Task Queue"
+              parent="menu_prema_ai_root"
+              action="action_prema_ai_task_queue"
+              sequence="20"/>
 </odoo>

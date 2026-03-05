@@ -37,7 +37,6 @@ class PremaAuditIssue(models.Model):
             fix = json.loads(issue.fix_action)
         except Exception:
             return {"error": "Invalid fix JSON"}
-
         try:
             fix_type = fix.get("type")
             if fix_type == "update_record":
@@ -55,7 +54,6 @@ class PremaAuditIssue(models.Model):
             issue.write({"fix_state": "failed", "fix_result": str(e)})
             self._log_fix(issue, fix, "FAILED: {}".format(e), approved=False)
             return {"error": str(e)}
-
         issue.write({
             "fix_state": "executed",
             "fix_executed_by": self.env.user.id,
@@ -74,8 +72,6 @@ class PremaAuditIssue(models.Model):
             fix = json.loads(issue.fix_action or "{}")
         except Exception:
             fix = {}
-
-        # Record correction for ML learning
         try:
             self.env["prema.ai.correction"].record_correction(
                 context_type="fix_rejection",
@@ -85,7 +81,6 @@ class PremaAuditIssue(models.Model):
             )
         except Exception:
             pass
-
         self._log_fix(issue, fix, "REJECTED: {}".format(reason), approved=False)
         return {"success": True}
 

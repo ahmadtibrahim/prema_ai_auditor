@@ -1,10 +1,8 @@
-# File: prema_ai_auditor/__manifest__.py
-
 {
     'name': 'Prema AI Auditor',
-    'version': '1.0.0',
+    'version': '18.0.5.0.0',
     'category': 'Tools',
-    'summary': 'AI CEO Assistant for CRM, Accounting and Operations',
+    'summary': 'AI CEO Assistant for CRM, Accounting, Documents and Operations',
     'author': 'PremaFirm Inc.',
     'license': 'LGPL-3',
     'depends': [
@@ -23,13 +21,22 @@
     ],
     'data': [
         'security/ir.model.access.csv',
-        'views/ai_console_views.xml',
+        'security/record_rules.xml',
+        'views/session_views.xml',
+        'views/task_queue_views.xml',
+        'views/menu_views.xml',
     ],
     'assets': {
         'web.assets_backend': [
-            'prema_ai_auditor/static/src/xml/*.xml',
-            'prema_ai_auditor/static/src/js/*.js',
-            'prema_ai_auditor/static/src/css/*.css',
+            # CSS — explicit order
+            'prema_ai_auditor/static/src/css/ai_console.css',
+            'prema_ai_auditor/static/src/css/main.css',
+            # XML templates — must come BEFORE JS
+            'prema_ai_auditor/static/src/xml/ai_console.xml',
+            'prema_ai_auditor/static/src/xml/audit_dashboard.xml',
+            # JS — explicit files, explicit order (NO wildcard)
+            'prema_ai_auditor/static/src/js/ai_console.js',
+            'prema_ai_auditor/static/src/js/audit_dashboard.js',
         ],
     },
     'application': True,

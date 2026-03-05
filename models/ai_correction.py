@@ -32,13 +32,10 @@ class PremaAICorrection(models.Model):
     @api.model
     def record_correction(self, context_type, ai_suggestion, user_correction, tags=""):
         lesson = _generate_lesson(context_type, ai_suggestion, user_correction)
-
-        # De-duplicate identical lessons
         existing = self.search([("context_type", "=", context_type), ("lesson", "=", lesson)], limit=1)
         if existing:
             existing.applied_count += 1
             return existing.id
-
         record = self.create({
             "context_type": context_type,
             "ai_suggestion": json.dumps(ai_suggestion, default=str) if not isinstance(ai_suggestion, str) else ai_suggestion,
@@ -46,12 +43,9 @@ class PremaAICorrection(models.Model):
             "lesson": lesson,
             "tags": tags,
         })
-
-        # Trigger retrain every RETRAIN_THRESHOLD new corrections
         total = self.search_count([])
         if total % RETRAIN_THRESHOLD == 0:
             self._trigger_retrain()
-
         return record.id
 
     @api.model
@@ -78,7 +72,6 @@ class PremaAICorrection(models.Model):
 
     @api.model
     def trigger_retrain(self):
-        """Public method to manually trigger ML retraining."""
         self._trigger_retrain()
         return {"success": True}
 

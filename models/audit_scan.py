@@ -40,7 +40,6 @@ class PremaAuditScan(models.Model):
     def run_scan(self, categories=None):
         start = time.time()
         scan = self.create({"state": "running"})
-
         scanners = {
             "accounts": accounts.scan,
             "journals": journals.scan,
@@ -50,10 +49,8 @@ class PremaAuditScan(models.Model):
             "system": system.scan,
             "logistics": logistics.scan,
         }
-
         selected = categories or list(scanners.keys())
         all_issues = []
-
         for cat in selected:
             if cat in scanners:
                 try:
@@ -64,9 +61,7 @@ class PremaAuditScan(models.Model):
                         "title": "Scanner error in: {}".format(cat), "detail": str(e),
                         "affected_model": None, "affected_ids": [], "fix_action": None,
                     })
-
         all_issues.sort(key=lambda i: RISK_ORDER.get(i.get("risk", "low"), 3))
-
         Issue = self.env["prema.audit.issue"]
         for issue in all_issues:
             Issue.create({
@@ -81,7 +76,6 @@ class PremaAuditScan(models.Model):
                 "fix_action": json.dumps(issue["fix_action"]) if issue.get("fix_action") else False,
                 "fix_state": "pending" if issue.get("fix_action") else "no_fix",
             })
-
         scan.write({
             "state": "done",
             "scan_categories": ", ".join(selected),

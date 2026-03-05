@@ -1,20 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Prema AI Session: users see only their own sessions -->
     <record id="rule_prema_ai_session_own" model="ir.rule">
         <field name="name">Prema AI Session - Own Only</field>
         <field name="model_id" ref="model_prema_ai_session"/>
-        <field name="domain_force">[('user_id','=',user.id)]</field>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('base.group_user'))]"/>
     </record>
+
+    <!-- Prema AI Message: users see only messages from their sessions -->
     <record id="rule_prema_ai_message_own" model="ir.rule">
         <field name="name">Prema AI Message - Own Only</field>
         <field name="model_id" ref="model_prema_ai_message"/>
-        <field name="domain_force">[('session_id.user_id','=',user.id)]</field>
+        <field name="domain_force">[('session_id.user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('base.group_user'))]"/>
     </record>
+
+    <!-- Prema Audit Scan: users see only their own scans -->
     <record id="rule_prema_audit_scan_own" model="ir.rule">
         <field name="name">Prema Audit Scan - Own Only</field>
         <field name="model_id" ref="model_prema_audit_scan"/>
-        <field name="domain_force">[('user_id','=',user.id)]</field>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('base.group_user'))]"/>
     </record>
 </odoo>

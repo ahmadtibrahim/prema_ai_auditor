@@ -12,9 +12,9 @@ class PremaAiSession(models.Model):
 
     name = fields.Char(default='AI Session')
     user_id = fields.Many2one('res.users', default=lambda self: self.env.user)
-    # FIX #1: No 'order' param here — ordering defined on message model below
     message_ids = fields.One2many('prema.ai.session.message', 'session_id', string='Messages')
     state = fields.Selection([('active', 'Active'), ('closed', 'Closed')], default='active')
+    last_attachment_id = fields.Many2one('prema.ai.attachment', string='Last Attachment')
 
     @api.model
     def get_or_create_session(self):
@@ -27,7 +27,7 @@ class PremaAiSession(models.Model):
 class PremaAiSessionMessage(models.Model):
     _name = 'prema.ai.session.message'
     _description = 'Prema AI Message'
-    _order = 'create_date asc, id asc'   # FIX #1: order lives HERE on the model
+    _order = 'create_date asc, id asc'
 
     session_id = fields.Many2one('prema.ai.session', ondelete='cascade', required=True)
     role = fields.Selection([('user', 'User'), ('assistant', 'Assistant'), ('system', 'System')],

@@ -1,0 +1,163 @@
+============================================================
+PREMA AI AUDITOR — USER MANUAL
+Version 18.0.3.0.0
+============================================================
+
+1. AI CONSOLE
+============================================================
+The AI Console is your primary interface for interacting with
+Prema AI inside Odoo 18.
+
+HOW TO USE:
+- Navigate to: Prema AI > AI Console
+- Click "New Chat" to start a session
+- Type your question or command
+- The AI responds using OpenAI GPT
+
+EXAMPLE COMMANDS:
+- "Show unpaid invoices"
+- "Financial summary"
+- "Check duplicate bills"
+- "Find stale leads"
+- "Show overdue tasks"
+
+The AI will respond with data from your Odoo system.
+For record-modifying actions, it will show a preview
+and ask for your approval before executing.
+
+2. TASK APPROVAL
+============================================================
+Prema AI operates in EXECUTE_WITH_APPROVAL mode.
+
+This means:
+- Read-only queries execute immediately
+- Record changes require your explicit approval
+- The AI never deletes records automatically
+
+WORKFLOW:
+1. You request an action
+2. AI generates a preview
+3. You review and approve or reject
+4. System executes the approved action
+5. Action is logged in Audit Logs
+
+TASK QUEUE:
+- Navigate to: Prema AI > Task Queue
+- View pending, approved, rejected, and completed tasks
+- Click "Approve & Execute" to run a pending task
+- Click "Reject" to cancel
+
+3. DOCUMENT UPLOAD (BILL PROCESSING)
+============================================================
+Upload PDF invoices or images directly in the AI Console.
+
+WORKFLOW:
+1. Open a chat session
+2. Click the attachment button (paperclip icon)
+3. Select a PDF or image file
+4. AI extracts invoice data automatically
+5. Review the extracted data preview
+6. Type "create draft" to create a vendor bill
+7. The draft bill appears in Accounting > Vendor Bills
+
+SUPPORTED FORMATS:
+- PDF (text-based and scanned)
+- JPEG, PNG, WebP images
+
+EXTRACTION METHODS:
+1. OpenAI GPT-4o Vision (primary, most accurate)
+2. Tesseract OCR (fallback for local processing)
+
+The system also applies ML predictions for:
+- Account code suggestions
+- Tax code suggestions
+- Duplicate bill detection
+
+4. AUDIT SCANS
+============================================================
+Full system scans check your Odoo instance for issues.
+
+CATEGORIES SCANNED:
+- Accounts: chart of accounts, missing codes
+- Journals: configuration, duplicates
+- Bills: unposted, duplicates, missing vendors
+- Aging: overdue receivables and payables
+- Security: admin review, inactive users, permissions
+- System: missing parameters, module states
+- Logistics: stock configuration
+
+HOW TO RUN:
+Option 1: Prema AI > Audit Scanner > Run Full Scan
+Option 2: Prema AI > Audit Scans > Create new scan
+
+VIEWING RESULTS:
+- Issues are color-coded by risk level
+- Critical (red), High (orange), Medium (blue), Low (green)
+- Some issues include auto-fix suggestions
+- Review and approve fixes before execution
+
+5. SYSTEM CONFIGURATION
+============================================================
+
+API KEY SETUP:
+1. Go to Settings > Technical > Parameters > System Parameters
+2. Set: openai.api_key = your-openai-api-key
+
+MODEL CONFIGURATION:
+The system uses three AI models:
+
+Parameter                    Default     Purpose
+prema_ai.primary_model       gpt-5.3     Main chat model
+prema_ai.fast_model          gpt-5.2     Fast UI responses
+prema_ai.vision_model        gpt-4o      Document OCR/vision
+
+You can change these in System Parameters.
+
+OTHER PARAMETERS:
+prema_ai.poppler_path        /usr/bin    PDF processing path
+
+6. SAFETY RULES
+============================================================
+- AI NEVER deletes records automatically
+- All modifications require user approval
+- Every AI action is logged in Audit Logs
+- The system operates in EXECUTE_WITH_APPROVAL mode
+- Record creation produces DRAFT records only
+- Users must post/validate records manually
+
+7. MENU STRUCTURE
+============================================================
+Prema AI (root menu)
+├── AI Console          — Chat interface
+├── Task Queue          — Pending/completed tasks
+├── Audit Scanner       — Interactive scan dashboard
+├── Audit Scans         — Scan history (list view)
+├── Audit Issues        — All issues across scans
+├── Audit Logs          — AI action audit trail
+├── Document Intelligence — Uploaded attachments
+├── Corrections         — AI learning corrections
+├── Fix Logs            — Audit fix execution logs
+└── Settings            — AI system parameters
+
+8. TROUBLESHOOTING
+============================================================
+
+AI NOT RESPONDING:
+- Check openai.api_key is set in System Parameters
+- Verify the API key is valid and has credits
+- Check Odoo logs: /var/log/odoo/odoo18.log
+
+DOCUMENT EXTRACTION FAILS:
+- Ensure the file is a valid PDF or image
+- Check that poppler-utils and tesseract-ocr are installed
+- For best results, use clear, high-resolution documents
+
+ASSET ERRORS (JavaScript):
+- Clear browser cache
+- Run: Settings > Technical > Clear Assets
+- Or via database:
+  DELETE FROM ir_attachment WHERE name LIKE '%assets_%';
+
+============================================================
+END OF MANUAL
+============================================================

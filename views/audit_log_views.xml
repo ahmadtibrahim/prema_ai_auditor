@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_audit_log_list" model="ir.ui.view">
+        <field name="name">prema.ai.audit.log.list</field>
+        <field name="model">prema.ai.audit.log</field>
+        <field name="arch" type="xml">
+            <list string="Audit Logs" create="false" edit="false" delete="false">
+                <field name="timestamp"/>
+                <field name="user_id"/>
+                <field name="action_type"/>
+                <field name="model"/>
+                <field name="record_id"/>
+                <field name="status" widget="badge"
+                       decoration-success="status=='completed'"
+                       decoration-danger="status=='failed'"
+                       decoration-warning="status=='rejected'"
+                       decoration-info="status=='pending'"/>
+                <field name="summary"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_audit_log_form" model="ir.ui.view">
+        <field name="name">prema.ai.audit.log.form</field>
+        <field name="model">prema.ai.audit.log</field>
+        <field name="arch" type="xml">
+            <form string="Audit Log" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="timestamp"/>
+                            <field name="user_id"/>
+                            <field name="action_type"/>
+                        </group>
+                        <group>
+                            <field name="model"/>
+                            <field name="record_id"/>
+                            <field name="status"/>
+                        </group>
+                    </group>
+                    <group string="Summary">
+                        <field name="summary"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

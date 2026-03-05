@@ -1,3 +1,5 @@
+# FILE: /opt/odoo/custum-addons/prema_ai_auditor/models/audit_scan.py
+
 import json
 import time
 from datetime import datetime
@@ -13,9 +15,17 @@ class PremaAuditScan(models.Model):
     _description = "Prema Audit Scan"
     _order = "create_date desc"
 
-    name = fields.Char(default=lambda self: "Scan {}".format(datetime.now().strftime("%Y-%m-%d %H:%M")))
-    user_id = fields.Many2one("res.users", default=lambda self: self.env.user, readonly=True)
-    state = fields.Selection([("running", "Running"), ("done", "Done"), ("error", "Error")], default="running")
+    name = fields.Char(
+        default=lambda self: "Scan {}".format(datetime.now().strftime("%Y-%m-%d %H:%M")),
+    )
+    user_id = fields.Many2one(
+        "res.users", default=lambda self: self.env.user, readonly=True,
+    )
+    state = fields.Selection([
+        ("running", "Running"),
+        ("done", "Done"),
+        ("error", "Error"),
+    ], default="running")
     issue_ids = fields.One2many("prema.audit.issue", "scan_id")
     total_issues = fields.Integer(compute="_compute_counts", store=True)
     critical_count = fields.Integer(compute="_compute_counts", store=True)
@@ -38,33 +48,44 @@ class PremaAuditScan(models.Model):
 
     @api.model
     def run_scan(self, categories=None):
+        scan = self.create({})
         start = time.time()
-        scan = self.create({"state": "running"})
+
         scanners = {
-            "accounts": accounts.scan,
-            "journals": journals.scan,
-            "bills": bills.scan,
-            "aging": aging.scan,
-            "security": security.scan,
-            "system": system.scan,
-            "logistics": logistics.scan,
+            "accounts": accounts,
+            "journals": journals,
+            "bills": bills,
+            "aging": aging,
+            "security": security,
+            "system": system,
+            "logistics": logistics,
         }
+
         selected = categories or list(scanners.keys())
         all_issues = []
         for cat in selected:
-            if cat in scanners:
-                try:
-                    all_issues.extend(scanners[cat](self.env))
-                except Exception as e:
-                    all_issues.append({
-                        "category": cat, "code": "SCANNER_ERROR", "risk": "low",
-                        "title": "Scanner error in: {}".format(cat), "detail": str(e),
-                        "affected_model": None, "affected_ids": [], "fix_action": None,
-                    })
-        all_issues.sort(key=lambda i: RISK_ORDER.get(i.get("risk", "low"), 3))
-        Issue = self.env["prema.audit.issue"]
+            scanner = scanners.get(cat)
+            if not scanner:
+                continue
+            try:
+                issues = scanner.scan(self.env)
+                all_issues.extend(issues)
+            except Exception as e:
+                all_issues.append({
+                    "category": cat,
+                    "code": "SCAN_ERROR",
+                    "risk": "high",
+                    "title": "Scanner Error: {}".format(cat),
+                    "detail": str(e),
+                    "affected_model": None,
+                    "affected_ids": [],
+                    "fix_action": None,
+                })
+
+        all_issues.sort(key=lambda x: RISK_ORDER.get(x.get("risk", "low"), 3))
+
         for issue in all_issues:
-            Issue.create({
+            self.env["prema.audit.issue"].create({
                 "scan_id": scan.id,
                 "category": issue.get("category", ""),
                 "code": issue.get("code", ""),
@@ -76,6 +97,7 @@ class PremaAuditScan(models.Model):
                 "fix_action": json.dumps(issue["fix_action"]) if issue.get("fix_action") else False,
                 "fix_state": "pending" if issue.get("fix_action") else "no_fix",
             })
+
         scan.write({
             "state": "done",
             "scan_categories": ", ".join(selected),
@@ -88,14 +110,25 @@ class PremaAuditScan(models.Model):
         scan = self.browse(scan_id)
         scan.ensure_one()
         return {
-            "scan_id": scan.id, "name": scan.name, "state": scan.state,
+            "scan_id": scan.id,
+            "name": scan.name,
+            "state": scan.state,
             "duration": scan.duration_seconds,
-            "total": scan.total_issues, "critical": scan.critical_count,
-            "high": scan.high_count, "medium": scan.medium_count, "low": scan.low_count,
+            "total": scan.total_issues,
+            "critical": scan.critical_count,
+            "high": scan.high_count,
+            "medium": scan.medium_count,
+            "low": scan.low_count,
             "issues": [{
-                "id": i.id, "category": i.category, "code": i.code, "risk": i.risk,
-                "title": i.title, "detail": i.detail, "affected_model": i.affected_model,
+                "id": i.id,
+                "category": i.category,
+                "code": i.code,
+                "risk": i.risk,
+                "title": i.title,
+                "detail": i.detail,
+                "affected_model": i.affected_model,
                 "affected_ids": json.loads(i.affected_ids or "[]"),
-                "fix_state": i.fix_state, "has_fix": bool(i.fix_action),
+                "fix_state": i.fix_state,
+                "has_fix": bool(i.fix_action),
             } for i in scan.issue_ids],
         }

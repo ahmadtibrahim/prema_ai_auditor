@@ -1,4 +1,1 @@
-from . import odoo_tools
-from . import document_intelligence
-from . import ai_executor
-from . import scanner
+# FILE: /opt/odoo/custum-addons/prema_ai_auditor/services/__init__.py

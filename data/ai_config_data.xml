@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <!-- TASK 3: Model configuration parameters -->
+    <record id="param_primary_model" model="ir.config_parameter">
+        <field name="key">prema_ai.primary_model</field>
+        <field name="value">gpt-5.3</field>
+    </record>
+    <record id="param_fast_model" model="ir.config_parameter">
+        <field name="key">prema_ai.fast_model</field>
+        <field name="value">gpt-5.2</field>
+    </record>
+    <record id="param_vision_model" model="ir.config_parameter">
+        <field name="key">prema_ai.vision_model</field>
+        <field name="value">gpt-4o</field>
+    </record>
+</odoo>

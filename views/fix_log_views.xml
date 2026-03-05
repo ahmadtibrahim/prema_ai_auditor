@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <record id="view_fix_log_list" model="ir.ui.view">
         <field name="name">prema.audit.fix.log.list</field>

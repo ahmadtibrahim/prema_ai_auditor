@@ -1,4 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <!-- ═══ AUDIT SCAN ═══ -->
     <record id="view_audit_scan_list" model="ir.ui.view">
         <field name="name">prema.audit.scan.list</field>
         <field name="model">prema.audit.scan</field>
@@ -56,6 +58,62 @@
                             </field>
                         </page>
                     </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══ AUDIT ISSUE ═══ -->
+    <record id="view_audit_issue_list" model="ir.ui.view">
+        <field name="name">prema.audit.issue.list</field>
+        <field name="model">prema.audit.issue</field>
+        <field name="arch" type="xml">
+            <list string="Audit Issues">
+                <field name="risk" widget="badge"
+                       decoration-danger="risk=='critical'"
+                       decoration-warning="risk=='high'"
+                       decoration-info="risk=='medium'"
+                       decoration-success="risk=='low'"/>
+                <field name="category"/>
+                <field name="code"/>
+                <field name="title"/>
+                <field name="affected_model"/>
+                <field name="fix_state"/>
+                <field name="scan_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_audit_issue_form" model="ir.ui.view">
+        <field name="name">prema.audit.issue.form</field>
+        <field name="model">prema.audit.issue</field>
+        <field name="arch" type="xml">
+            <form string="Audit Issue">
+                <header>
+                    <field name="fix_state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="scan_id"/>
+                            <field name="category"/>
+                            <field name="code"/>
+                            <field name="risk"/>
+                        </group>
+                        <group>
+                            <field name="affected_model"/>
+                            <field name="fix_executed_by"/>
+                            <field name="fix_executed_at"/>
+                        </group>
+                    </group>
+                    <group string="Details">
+                        <field name="title"/>
+                        <field name="detail"/>
+                    </group>
+                    <group string="Fix">
+                        <field name="fix_action"/>
+                        <field name="fix_result"/>
+                    </group>
                 </sheet>
             </form>
         </field>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_ai_task_list" model="ir.ui.view">
+        <field name="name">prema.ai.task.list</field>
+        <field name="model">prema.ai.task</field>
+        <field name="arch" type="xml">
+            <list string="AI Task Queue">
+                <field name="name"/>
+                <field name="action_type"/>
+                <field name="state" widget="badge"
+                       decoration-info="state=='pending'"
+                       decoration-success="state in ('approved','completed')"
+                       decoration-danger="state in ('rejected','failed')"
+                       decoration-warning="state=='running'"/>
+                <field name="user_id"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_task_form" model="ir.ui.view">
+        <field name="name">prema.ai.task.form</field>
+        <field name="model">prema.ai.task</field>
+        <field name="arch" type="xml">
+            <form string="AI Task">
+                <header>
+                    <button name="action_approve" type="object" string="Approve &amp; Execute"
+                            class="btn-primary"
+                            invisible="state != 'pending'"/>
+                    <button name="action_reject" type="object" string="Reject"
+                            class="btn-secondary"
+                            invisible="state != 'pending'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="action_type"/>
+                            <field name="user_id"/>
+                            <field name="session_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Parameters">
+                            <field name="params"/>
+                        </page>
+                        <page string="Result">
+                            <field name="result"/>
+                        </page>
+                        <page string="Error">
+                            <field name="error_message"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

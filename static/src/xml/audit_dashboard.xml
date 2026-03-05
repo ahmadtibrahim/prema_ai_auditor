@@ -2,15 +2,118 @@
 <templates xml:space="preserve">
 <t t-name="prema_audit_dashboard.AuditDashboard">
 <div class="o_audit_layout">
-    <div class="o_audit_topbar" style="background:white;border-bottom:1px solid #e5e7eb;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
+
+    <div class="o_audit_topbar">
         <div>
-            <h2 style="margin:0;font-size:18px;color:#1f2937;">Prema AI Audit Scanner</h2>
-            <small style="color:#6b7280;font-size:12px;">Full system scan: accounts, journals, bills, aging, security, logistics</small>
+            <h2><i class="fa fa-shield me-2" style="color:#4f46e5;"/>Prema AI Audit Scanner</h2>
+            <small>Full system scan: accounts, journals, bills, aging, security, logistics</small>
         </div>
+        <button class="o_audit_scan_btn" t-on-click="runScan"
+                t-att-disabled="state.isScanning ? true : undefined">
+            <i t-att-class="state.isScanning ? 'fa fa-spinner fa-spin' : 'fa fa-search'"/>
+            <t t-if="state.isScanning">Scanning&#x2026;</t>
+            <t t-else="">Run Full Scan</t>
+        </button>
     </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#9ca3af;">
-        <p>Audit Dashboard — access via Prema AI Console chat</p>
-    </div>
+
+    <t t-if="state.errorMsg">
+        <div class="o_ai_error_msg" style="margin:16px 24px;">
+            <i class="fa fa-exclamation-triangle me-2"/>
+            <t t-esc="state.errorMsg"/>
+        </div>
+    </t>
+
+    <t t-if="!state.scanDone and !state.isScanning">
+        <div class="o_audit_empty">
+            <i class="fa fa-search"/>
+            <p>No scan results yet</p>
+            <small style="color:#c4b5fd;">Click &#x201C;Run Full Scan&#x201D; to analyse your Odoo instance</small>
+        </div>
+    </t>
+
+    <t t-if="state.isScanning">
+        <div class="o_audit_empty">
+            <i class="fa fa-spinner fa-spin" style="color:#4f46e5;"/>
+            <p>Scanning your Odoo database&#x2026;</p>
+            <small style="color:#c4b5fd;">Checking accounts, journals, bills, aging, security, logistics</small>
+        </div>
+    </t>
+
+    <t t-if="state.scanDone and state.results">
+
+        <div class="o_audit_summary">
+            <div class="o_audit_card total"><div class="count" t-esc="state.results.total"/><div class="label">Total Issues</div></div>
+            <div class="o_audit_card critical"><div class="count" t-esc="state.results.critical"/><div class="label">Critical</div></div>
+            <div class="o_audit_card high"><div class="count" t-esc="state.results.high"/><div class="label">High</div></div>
+            <div class="o_audit_card medium"><div class="count" t-esc="state.results.medium"/><div class="label">Medium</div></div>
+            <div class="o_audit_card low"><div class="count" t-esc="state.results.low"/><div class="label">Low</div></div>
+            <div class="o_audit_card" style="border-color:#e5e7eb;">
+                <div class="count" style="color:#6b7280;font-size:18px;" t-esc="state.results.duration + 's'"/>
+                <div class="label">Scan Duration</div>
+            </div>
+        </div>
+
+        <div class="o_audit_filters">
+            <button t-att-class="'o_audit_filter_btn' + (state.activeFilter === 'all' ? ' active' : '')"
+                    t-on-click="() => this.setFilter('all')">All</button>
+            <button t-att-class="'o_audit_filter_btn' + (state.activeFilter === 'critical' ? ' active' : '')"
+                    t-on-click="() => this.setFilter('critical')">Critical</button>
+            <button t-att-class="'o_audit_filter_btn' + (state.activeFilter === 'high' ? ' active' : '')"
+                    t-on-click="() => this.setFilter('high')">High</button>
+            <button t-att-class="'o_audit_filter_btn' + (state.activeFilter === 'medium' ? ' active' : '')"
+                    t-on-click="() => this.setFilter('medium')">Medium</button>
+            <button t-att-class="'o_audit_filter_btn' + (state.activeFilter === 'low' ? ' active' : '')"
+                    t-on-click="() => this.setFilter('low')">Low</button>
+            <span style="width:1px;background:#e5e7eb;margin:0 4px;"/>
+            <button t-att-class="'o_audit_filter_btn' + (state.activeCategory === 'all' ? ' active' : '')"
+                    t-on-click="() => this.setCategory('all')">All Categories</button>
+            <t t-foreach="categories" t-as="cat" t-key="cat">
+                <button t-att-class="'o_audit_filter_btn' + (state.activeCategory === cat ? ' active' : '')"
+                        t-on-click="() => this.setCategory(cat)" t-esc="cat"/>
+            </t>
+        </div>
+
+        <div class="o_audit_issues">
+            <t t-if="filteredIssues.length === 0">
+                <div style="text-align:center;padding:40px;color:#9ca3af;">
+                    <i class="fa fa-check-circle" style="font-size:32px;color:#16a34a;display:block;margin-bottom:8px;"/>
+                    No issues found for this filter.
+                </div>
+            </t>
+            <t t-foreach="filteredIssues" t-as="issue" t-key="issue.id">
+                <div t-att-class="'o_audit_issue ' + issue.risk">
+                    <div class="o_audit_issue_header">
+                        <span t-att-class="'o_audit_risk_badge ' + issue.risk" t-esc="issue.risk"/>
+                        <span class="o_audit_issue_title" t-esc="issue.title"/>
+                        <span class="o_audit_cat_badge" t-esc="issue.category"/>
+                        <span class="o_audit_cat_badge" style="color:#9ca3af;" t-esc="issue.code"/>
+                    </div>
+                    <div class="o_audit_issue_detail" t-esc="issue.detail"/>
+                    <t t-if="issue.has_fix and issue.fix_state === 'pending'">
+                        <div class="o_audit_fix_bar">
+                            <button class="o_audit_approve_btn" t-on-click="() => this.approveFix(issue.id)">
+                                <i class="fa fa-check me-1"/> Approve Fix
+                            </button>
+                            <button class="o_audit_reject_btn" t-on-click="() => this.rejectFix(issue.id)">
+                                <i class="fa fa-times me-1"/> Reject
+                            </button>
+                        </div>
+                    </t>
+                    <t t-if="issue.fix_state === 'executed'">
+                        <div class="o_audit_fix_status executed"><i class="fa fa-check-circle"/> Fix executed</div>
+                    </t>
+                    <t t-if="issue.fix_state === 'rejected'">
+                        <div class="o_audit_fix_status rejected"><i class="fa fa-times-circle"/> Fix rejected</div>
+                    </t>
+                    <t t-if="issue.fix_state === 'failed'">
+                        <div class="o_audit_fix_status failed"><i class="fa fa-exclamation-circle"/> Fix failed</div>
+                    </t>
+                </div>
+            </t>
+        </div>
+
+    </t>
+
 </div>
 </t>
 </templates>

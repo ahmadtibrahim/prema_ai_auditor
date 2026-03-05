@@ -1,3 +1,5 @@
+# FILE: /opt/odoo/custum-addons/prema_ai_auditor/models/audit_issue.py
+
 import json
 from odoo import api, fields, models
 
@@ -7,19 +9,29 @@ class PremaAuditIssue(models.Model):
     _description = "Prema Audit Issue"
     _order = "risk asc, id asc"
 
-    scan_id = fields.Many2one("prema.audit.scan", required=True, ondelete="cascade", index=True)
+    scan_id = fields.Many2one(
+        "prema.audit.scan", required=True, ondelete="cascade", index=True,
+    )
     category = fields.Char()
     code = fields.Char()
-    risk = fields.Selection([("critical", "Critical"), ("high", "High"), ("medium", "Medium"), ("low", "Low")], required=True, default="low")
+    risk = fields.Selection([
+        ("critical", "Critical"),
+        ("high", "High"),
+        ("medium", "Medium"),
+        ("low", "Low"),
+    ], required=True, default="low")
     title = fields.Char(required=True)
     detail = fields.Text()
     affected_model = fields.Char()
     affected_ids = fields.Text()
     fix_action = fields.Text()
     fix_state = fields.Selection([
-        ("no_fix", "No Auto-Fix"), ("pending", "Pending Approval"),
-        ("approved", "Approved"), ("rejected", "Rejected"),
-        ("executed", "Executed"), ("failed", "Failed"),
+        ("no_fix", "No Auto-Fix"),
+        ("pending", "Pending Approval"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("executed", "Executed"),
+        ("failed", "Failed"),
     ], default="no_fix")
     fix_executed_by = fields.Many2one("res.users")
     fix_executed_at = fields.Datetime()
@@ -37,6 +49,7 @@ class PremaAuditIssue(models.Model):
             fix = json.loads(issue.fix_action)
         except Exception:
             return {"error": "Invalid fix JSON"}
+
         try:
             fix_type = fix.get("type")
             if fix_type == "update_record":
@@ -54,6 +67,7 @@ class PremaAuditIssue(models.Model):
             issue.write({"fix_state": "failed", "fix_result": str(e)})
             self._log_fix(issue, fix, "FAILED: {}".format(e), approved=False)
             return {"error": str(e)}
+
         issue.write({
             "fix_state": "executed",
             "fix_executed_by": self.env.user.id,
@@ -67,11 +81,15 @@ class PremaAuditIssue(models.Model):
     def reject_fix(self, issue_id, reason=""):
         issue = self.browse(issue_id)
         issue.ensure_one()
-        issue.write({"fix_state": "rejected", "fix_result": "Rejected: {}".format(reason)})
+        issue.write({
+            "fix_state": "rejected",
+            "fix_result": "Rejected: {}".format(reason),
+        })
         try:
             fix = json.loads(issue.fix_action or "{}")
         except Exception:
             fix = {}
+
         try:
             self.env["prema.ai.correction"].record_correction(
                 context_type="fix_rejection",
@@ -81,6 +99,7 @@ class PremaAuditIssue(models.Model):
             )
         except Exception:
             pass
+
         self._log_fix(issue, fix, "REJECTED: {}".format(reason), approved=False)
         return {"success": True}
 

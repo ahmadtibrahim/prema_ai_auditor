@@ -1,185 +1,356 @@
+# FILE: /opt/odoo/custum-addons/prema_ai_auditor/services/odoo_tools.py
 """
-OdooTools: Complete ORM access layer for Prema AI.
-Gives the AI read/write/create access to all models + full system introspection.
+TASK 10: AI Tool Services
+Safe, read-only tool methods that return structured JSON.
+All methods receive an Odoo `env` object.
 """
+
 import json
 import logging
-from odoo import models, api, fields
+from datetime import date, timedelta
 
 _logger = logging.getLogger(__name__)
 
 
-class OdooTools(models.AbstractModel):
-    _name = 'prema.ai.odoo.tools'
-    _description = 'Prema AI ORM Tools'
+# ═══════════════════════════════════════════════════════════════
+# MODULE HEALTH
+# ═══════════════════════════════════════════════════════════════
 
-    # ── Generic ORM ──────────────────────────────────────────────────────────
-
-    @api.model
-    def read_records(self, model_name, domain=None, field_names=None, limit=50, order=None):
-        try:
-            M = self.env[model_name].sudo()
-            recs = M.search(domain or [], limit=limit, order=order)
-            return recs.read(field_names) if field_names else recs.read(self._safe_fields(M))
-        except Exception as e:
-            return {'error': str(e)}
-
-    @api.model
-    def count_records(self, model_name, domain=None):
-        try:
-            return self.env[model_name].sudo().search_count(domain or [])
-        except Exception as e:
-            return {'error': str(e)}
-
-    @api.model
-    def create_record(self, model_name, values):
-        try:
-            rec = self.env[model_name].sudo().create(values)
-            return {'success': True, 'record_model': model_name, 'record_id': rec.id}
-        except Exception as e:
-            return {'error': str(e)}
-
-    @api.model
-    def update_record(self, model_name, record_id, values):
-        try:
-            rec = self.env[model_name].sudo().browse(record_id)
-            if not rec.exists():
-                return {'error': f'{model_name}/{record_id} not found'}
-            rec.write(values)
-            return {'success': True, 'record_id': record_id}
-        except Exception as e:
-            return {'error': str(e)}
-
-    @api.model
-    def search_records(self, model_name, domain, field_names=None, limit=100):
-        return self.read_records(model_name, domain=domain, field_names=field_names, limit=limit)
-
-    def _safe_fields(self, Model, max_fields=12):
-        """Return a sensible subset of fields to avoid binary/compute overload."""
-        skip_types = {'binary', 'serialized'}
-        result = []
-        for fname, f in Model._fields.items():
-            if f.type not in skip_types and not fname.startswith('_'):
-                result.append(fname)
-            if len(result) >= max_fields:
-                break
-        return result or ['id', 'name']
-
-    # ── Business Summaries ────────────────────────────────────────────────────
-
-    @api.model
-    def get_accounting_summary(self):
-        try:
-            M = self.env['account.move'].sudo()
-            today = fields.Date.today()
-            return {
-                'draft_vendor_bills': M.search_count([('move_type', '=', 'in_invoice'), ('state', '=', 'draft')]),
-                'posted_vendor_bills': M.search_count([('move_type', '=', 'in_invoice'), ('state', '=', 'posted')]),
-                'draft_customer_invoices': M.search_count([('move_type', '=', 'out_invoice'), ('state', '=', 'draft')]),
-                'overdue_invoices': M.search_count([
-                    ('move_type', '=', 'out_invoice'), ('state', '=', 'posted'),
-                    ('payment_state', 'not in', ['paid', 'in_payment']),
-                    ('invoice_date_due', '<', today),
-                ]),
-                'total_partners': self.env['res.partner'].sudo().search_count([('customer_rank', '>', 0)]),
+def tool_list_modules(env):
+    """List installed Odoo modules with status."""
+    modules = env["ir.module.module"].sudo().search_read(
+        [("state", "=", "installed")],
+        ["name", "shortdesc", "state", "installed_version"],
+        limit=300,
+    )
+    return {
+        "count": len(modules),
+        "modules": [
+            {
+                "name": m["name"],
+                "display_name": m["shortdesc"],
+                "version": m["installed_version"],
+                "state": m["state"],
             }
-        except Exception as e:
-            return {'error': str(e)}
+            for m in modules
+        ],
+    }
 
-    @api.model
-    def get_crm_summary(self):
-        try:
-            L = self.env['crm.lead'].sudo()
-            return {
-                'open_leads': L.search_count([('active', '=', True), ('type', '=', 'lead')]),
-                'open_opportunities': L.search_count([('active', '=', True), ('type', '=', 'opportunity')]),
-                'won_opportunities': L.search_count([('active', '=', True), ('stage_id.is_won', '=', True)]),
+
+def tool_check_module_health(env, module_name):
+    """Check a specific module for issues."""
+    mod = env["ir.module.module"].sudo().search(
+        [("name", "=", module_name)], limit=1,
+    )
+    if not mod:
+        return {"error": f"Module '{module_name}' not found"}
+
+    issues = []
+
+    # Check state
+    if mod.state != "installed":
+        issues.append(f"Module is in state '{mod.state}', not 'installed'")
+
+    # Check for pending upgrades
+    if mod.state in ("to upgrade", "to install", "to remove"):
+        issues.append(f"Module has pending action: {mod.state}")
+
+    # Check views for this module
+    broken_views = env["ir.ui.view"].sudo().search([
+        ("model", "like", module_name.replace("_", ".")),
+    ])
+    view_count = len(broken_views)
+
+    return {
+        "module": module_name,
+        "display_name": mod.shortdesc,
+        "state": mod.state,
+        "version": mod.installed_version,
+        "views_count": view_count,
+        "issues": issues,
+        "healthy": len(issues) == 0,
+    }
+
+
+def tool_validate_views(env, module_name):
+    """Validate XML views for a module."""
+    views = env["ir.ui.view"].sudo().search([
+        ("model", "like", module_name.replace("_", ".")),
+    ])
+    results = []
+    for v in views[:50]:
+        results.append({
+            "view_id": v.id,
+            "name": v.name,
+            "model": v.model,
+            "type": v.type,
+            "active": v.active,
+        })
+    return {"module": module_name, "view_count": len(results), "views": results}
+
+
+def tool_validate_models(env, module_name):
+    """List models registered by a module."""
+    models = env["ir.model"].sudo().search_read(
+        [("model", "like", module_name.replace("_", "."))],
+        ["model", "name", "state", "transient"],
+        limit=50,
+    )
+    return {"module": module_name, "model_count": len(models), "models": models}
+
+
+# ═══════════════════════════════════════════════════════════════
+# CRON JOB MONITOR
+# ═══════════════════════════════════════════════════════════════
+
+def tool_check_cron_jobs(env):
+    """Review scheduled actions and their status."""
+    crons = env["ir.cron"].sudo().search_read(
+        [],
+        ["name", "active", "interval_number", "interval_type",
+         "nextcall", "numbercall", "priority"],
+        order="nextcall asc",
+        limit=100,
+    )
+    active = [c for c in crons if c["active"]]
+    inactive = [c for c in crons if not c["active"]]
+
+    return {
+        "total": len(crons),
+        "active_count": len(active),
+        "inactive_count": len(inactive),
+        "crons": [
+            {
+                "name": c["name"],
+                "active": c["active"],
+                "interval": f"{c['interval_number']} {c['interval_type']}",
+                "next_call": str(c["nextcall"]) if c["nextcall"] else None,
+                "remaining_calls": c["numbercall"],
             }
-        except Exception as e:
-            return {'error': str(e)}
+            for c in crons
+        ],
+    }
 
-    @api.model
-    def get_fleet_summary(self):
-        try:
-            V = self.env['fleet.vehicle'].sudo()
-            return {
-                'total_vehicles': V.search_count([]),
-                'active_vehicles': V.search_count([('active', '=', True)]),
-                'vehicles_needing_service': self.env['fleet.vehicle.log.services'].sudo().search_count([
-                    ('state_id.done', '=', False)
-                ]),
+
+# ═══════════════════════════════════════════════════════════════
+# CRM
+# ═══════════════════════════════════════════════════════════════
+
+def tool_find_stale_leads(env, days=30):
+    """Find CRM leads with no activity in N days."""
+    cutoff = date.today() - timedelta(days=days)
+    leads = env["crm.lead"].sudo().search_read(
+        [
+            ("type", "=", "lead"),
+            ("active", "=", True),
+            ("write_date", "<", str(cutoff)),
+        ],
+        ["name", "partner_name", "user_id", "stage_id",
+         "expected_revenue", "write_date"],
+        limit=50,
+    )
+    return {
+        "stale_count": len(leads),
+        "cutoff_days": days,
+        "leads": [
+            {
+                "id": l["id"],
+                "name": l["name"],
+                "partner": l["partner_name"],
+                "salesperson": l["user_id"][1] if l["user_id"] else None,
+                "stage": l["stage_id"][1] if l["stage_id"] else None,
+                "expected_revenue": l["expected_revenue"],
+                "last_updated": str(l["write_date"]),
             }
-        except Exception as e:
-            return {'error': str(e)}
+            for l in leads
+        ],
+    }
 
-    @api.model
-    def get_documents_summary(self):
-        """Summarize Odoo Documents module state."""
-        try:
-            Doc = self.env['documents.document'].sudo()
-            Folder = self.env['documents.folder'].sudo()
-            return {
-                'total_documents': Doc.search_count([]),
-                'total_folders': Folder.search_count([]),
-                'folders': [{'id': f.id, 'name': f.name} for f in Folder.search([], limit=50)],
+
+# ═══════════════════════════════════════════════════════════════
+# TASKS
+# ═══════════════════════════════════════════════════════════════
+
+def tool_show_overdue_tasks(env):
+    """List project tasks past their deadline."""
+    today = date.today()
+    tasks = env["project.task"].sudo().search_read(
+        [
+            ("date_deadline", "<", str(today)),
+            ("state", "not in", ["1_done", "1_canceled"]),
+        ],
+        ["name", "project_id", "user_ids", "date_deadline", "state", "stage_id"],
+        limit=50,
+    )
+    return {
+        "overdue_count": len(tasks),
+        "tasks": [
+            {
+                "id": t["id"],
+                "name": t["name"],
+                "project": t["project_id"][1] if t["project_id"] else None,
+                "assignees": t["user_ids"],
+                "deadline": str(t["date_deadline"]),
+                "stage": t["stage_id"][1] if t["stage_id"] else None,
             }
-        except Exception as e:
-            return {'error': str(e)}
+            for t in tasks
+        ],
+    }
 
-    # ── System Introspection ──────────────────────────────────────────────────
 
-    @api.model
-    def list_installed_modules(self):
-        mods = self.env['ir.module.module'].sudo().search([('state', '=', 'installed')], order='name')
-        return [{'name': m.name, 'display_name': m.shortdesc} for m in mods]
+# ═══════════════════════════════════════════════════════════════
+# HELPDESK
+# ═══════════════════════════════════════════════════════════════
 
-    @api.model
-    def list_models(self, keyword=None):
-        domain = [('transient', '=', False)]
-        if keyword:
-            domain.append(('model', 'ilike', keyword))
-        mods = self.env['ir.model'].sudo().search(domain, limit=100, order='model')
-        return [{'model': m.model, 'name': m.name} for m in mods]
-
-    @api.model
-    def get_model_fields(self, model_name):
-        try:
-            fs = self.env['ir.model.fields'].sudo().search([
-                ('model_id.model', '=', model_name),
-                ('ttype', 'not in', ['binary']),
-            ], limit=60, order='name')
-            return [{'name': f.name, 'type': f.ttype, 'label': f.field_description} for f in fs]
-        except Exception as e:
-            return {'error': str(e)}
-
-    @api.model
-    def list_cron_jobs(self):
-        crons = self.env['ir.cron'].sudo().search([], order='name')
-        return [{'name': c.name, 'active': c.active,
-                 'interval': f"{c.interval_number} {c.interval_type}",
-                 'next_call': str(c.nextcall)} for c in crons]
-
-    @api.model
-    def list_mail_templates(self, keyword=None):
-        domain = [('name', 'ilike', keyword)] if keyword else []
-        ts = self.env['mail.template'].sudo().search(domain, limit=50, order='name')
-        return [{'id': t.id, 'name': t.name, 'model': t.model} for t in ts]
-
-    @api.model
-    def get_system_params(self):
-        p = self.env['ir.config_parameter'].sudo()
-        return {k: p.get_param(k) for k in ['web.base.url', 'mail.catchall.domain', 'database.uuid']}
-
-    @api.model
-    def get_full_system_context(self):
-        import os
-        rules_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'rules', 'ai_governance_rules.txt')
-        governance = open(rules_path).read() if os.path.exists(rules_path) else ''
+def tool_find_old_tickets(env, days=14):
+    """Find helpdesk tickets open for N+ days."""
+    try:
+        cutoff = date.today() - timedelta(days=days)
+        tickets = env["helpdesk.ticket"].sudo().search_read(
+            [
+                ("create_date", "<", str(cutoff)),
+                ("stage_id.is_close", "=", False),
+            ],
+            ["name", "partner_id", "user_id", "team_id",
+             "create_date", "stage_id"],
+            limit=50,
+        )
         return {
-            'installed_modules_count': self.env['ir.module.module'].sudo().search_count([('state', '=', 'installed')]),
-            'models_count': self.env['ir.model'].sudo().search_count([]),
-            'users_count': self.env['res.users'].sudo().search_count([('active', '=', True)]),
-            'governance_rules': governance,
-            'addon_paths': ['/opt/odoo/custom-addons', '/opt/odoo/custum-addons'],
-            'erp_url': self.env['ir.config_parameter'].sudo().get_param('web.base.url'),
+            "old_ticket_count": len(tickets),
+            "cutoff_days": days,
+            "tickets": [
+                {
+                    "id": t["id"],
+                    "name": t["name"],
+                    "customer": t["partner_id"][1] if t["partner_id"] else None,
+                    "assigned_to": t["user_id"][1] if t["user_id"] else None,
+                    "team": t["team_id"][1] if t["team_id"] else None,
+                    "created": str(t["create_date"]),
+                    "stage": t["stage_id"][1] if t["stage_id"] else None,
+                }
+                for t in tickets
+            ],
         }
+    except KeyError:
+        return {"error": "Helpdesk module not installed"}
+
+
+# ═══════════════════════════════════════════════════════════════
+# SALES
+# ═══════════════════════════════════════════════════════════════
+
+def tool_find_unbilled_orders(env):
+    """Find confirmed sales orders that have not been invoiced."""
+    orders = env["sale.order"].sudo().search_read(
+        [
+            ("state", "=", "sale"),
+            ("invoice_status", "=", "to invoice"),
+        ],
+        ["name", "partner_id", "amount_total", "date_order", "user_id"],
+        limit=50,
+    )
+    return {
+        "unbilled_count": len(orders),
+        "total_value": sum(o["amount_total"] for o in orders),
+        "orders": [
+            {
+                "id": o["id"],
+                "name": o["name"],
+                "customer": o["partner_id"][1] if o["partner_id"] else None,
+                "amount": o["amount_total"],
+                "date": str(o["date_order"]),
+                "salesperson": o["user_id"][1] if o["user_id"] else None,
+            }
+            for o in orders
+        ],
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# EXPENSES
+# ═══════════════════════════════════════════════════════════════
+
+def tool_find_duplicate_expenses(env):
+    """Find expenses with same employee, amount, and date."""
+    try:
+        expenses = env["hr.expense"].sudo().search_read(
+            [("state", "in", ["draft", "reported", "approved"])],
+            ["name", "employee_id", "total_amount", "date", "state"],
+            limit=500,
+        )
+        seen = {}
+        duplicates = []
+        for exp in expenses:
+            key = (
+                exp["employee_id"][0] if exp["employee_id"] else 0,
+                round(exp["total_amount"], 2),
+                str(exp["date"]),
+            )
+            if key in seen:
+                duplicates.append({
+                    "expense_1": seen[key],
+                    "expense_2": {
+                        "id": exp["id"],
+                        "name": exp["name"],
+                        "employee": exp["employee_id"][1] if exp["employee_id"] else None,
+                        "amount": exp["total_amount"],
+                        "date": str(exp["date"]),
+                    },
+                })
+            else:
+                seen[key] = {
+                    "id": exp["id"],
+                    "name": exp["name"],
+                    "employee": exp["employee_id"][1] if exp["employee_id"] else None,
+                    "amount": exp["total_amount"],
+                    "date": str(exp["date"]),
+                }
+        return {"duplicate_count": len(duplicates), "duplicates": duplicates}
+    except KeyError:
+        return {"error": "Expense module not installed"}
+
+
+# ═══════════════════════════════════════════════════════════════
+# EMAIL
+# ═══════════════════════════════════════════════════════════════
+
+def tool_generate_email_template(env, subject, body_text, model_name="res.partner"):
+    """Generate an email template record (draft)."""
+    return {
+        "action": "create_email_template",
+        "preview": {
+            "subject": subject,
+            "body_html": f"<p>{body_text}</p>",
+            "model_id": model_name,
+        },
+        "requires_approval": True,
+        "message": f"Email template '{subject}' ready for approval.",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# DOCUMENTS
+# ═══════════════════════════════════════════════════════════════
+
+def tool_build_document_packet(env, folder_name, attachment_ids=None, domain=None):
+    """Organize attachments into a named folder/tag."""
+    if attachment_ids:
+        attachments = env["ir.attachment"].sudo().browse(attachment_ids)
+    elif domain:
+        attachments = env["ir.attachment"].sudo().search(domain, limit=100)
+    else:
+        return {"error": "Provide attachment_ids or search domain"}
+
+    return {
+        "action": "build_document_packet",
+        "preview": {
+            "folder_name": folder_name,
+            "attachment_count": len(attachments),
+            "attachments": [
+                {"id": a.id, "name": a.name, "mimetype": a.mimetype}
+                for a in attachments[:20]
+            ],
+        },
+        "requires_approval": True,
+        "message": f"Document packet '{folder_name}' with {len(attachments)} files ready for approval.",
+    }

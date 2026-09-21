@@ -2,19 +2,13 @@
 """
 AI Attachment Handler
 1. Accepts base64 PDF or image from chat
-2. Sends to OpenAI GPT-4o Vision for extraction (via /v1/responses)
-3. Falls back to Tesseract OCR if vision fails
+2. Extracts text locally: PDF text layer / pdf2image+tesseract / tesseract
+3. Parses the text into the logistics JSON schema via DeepSeek (text-only)
 4. Applies ML predictions (account, tax) from local models
 5. Creates draft vendor bill with attachment linked
 6. Stores AI suggestion for correction learning
 
-COMMIT NOTE (what changed)
-fix(vision): switch _extract_via_openai_vision from /v1/chat/completions to /v1/responses
-- Endpoint: /v1/chat/completions -> /v1/responses
-- Body: messages -> input, max_tokens -> max_output_tokens, added instructions
-- Parse: choices[0].message.content -> output_text
-- Model read from prema_ai.vision_model system parameter (default gpt-4o)
-- ALL OTHER LOGIC UNCHANGED
+No OpenAI API is used — images never leave the server (tesseract OCR only).
 """
 
 import base64
@@ -92,7 +86,8 @@ class PremaAIAttachment(models.Model):
         }
 
     def _extract_bill_data(self, file_b64: str, mimetype: str, filename: str) -> Dict[str, Any]:
-        api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key") or None
+        from odoo.addons.prema_ai_auditor.services import deepseek_client
+        has_ai = bool(deepseek_client.get_api_key(self.env))
 
         file_bytes, err = self._safe_b64decode(file_b64)
         if err:
@@ -112,11 +107,14 @@ class PremaAIAttachment(models.Model):
             return self._extract_pdf_via_ocr(file_bytes)
 
         if is_image:
-            if api_key:
-                result = self._extract_via_openai_vision(file_b64, mimetype, api_key)
-                if result and "error" not in result:
-                    return result
-            return self._extract_image_via_tesseract(file_bytes)
+            # Local tesseract OCR → DeepSeek parse (no vision API)
+            result = self._extract_image_via_tesseract(file_bytes)
+            if result and "error" not in result and has_ai:
+                parsed = self._parse_text_with_ai(result.get("raw_text", ""))
+                if parsed and "error" not in parsed:
+                    parsed["extraction_method"] = "image_ocr_ai"
+                    return parsed
+            return result
 
         return {"error": "Unsupported file type"}
 
@@ -134,9 +132,64 @@ class PremaAIAttachment(models.Model):
             text = "\n\n".join(text_parts).strip()
             if not text:
                 return {"error": "No text layer found in PDF"}
+            from odoo.addons.prema_ai_auditor.services import deepseek_client
+            if deepseek_client.get_api_key(self.env):
+                result = self._parse_text_with_ai(text)
+                if result and "error" not in result:
+                    return result
             return {"raw_text": text[:4000], "extraction_method": "pdf_text_layer"}
         except Exception as e:
             return {"error": f"PDF extraction failed: {str(e)}"}
+
+    # ---------------- AI TEXT PARSER ----------------
+
+    _LOGISTICS_EXTRACTION_PROMPT = (
+        "Extract freight/invoice document data and return ONLY valid JSON with these exact keys:\n"
+        "vendor_name, invoice_number, invoice_date (YYYY-MM-DD), due_date (YYYY-MM-DD), currency,\n"
+        "subtotal, tax_amount, total_amount,\n"
+        "delivery_number (Delivery # or DR #),\n"
+        "reference_number (Reference # or Ref #),\n"
+        "booking_number (Booking #),\n"
+        "bol_number (BOL # or Bill of Lading #),\n"
+        "po_number (PO # or Purchase Order #),\n"
+        "origin (pickup city or address),\n"
+        "destination (delivery city or address),\n"
+        "service_date (date of pickup or delivery, YYYY-MM-DD),\n"
+        "line_items (list of {description, quantity, unit_price, amount}).\n"
+        "Use null for missing fields. No markdown, no explanation."
+    )
+
+    def _parse_text_with_ai(self, raw_text: str) -> Dict[str, Any]:
+        """Parse document text into the logistics JSON schema via DeepSeek."""
+        try:
+            from odoo.addons.prema_ai_auditor.services import deepseek_client
+            raw = deepseek_client.deepseek_chat(
+                self.env,
+                [
+                    {"role": "system", "content": (
+                        "You are a logistics invoice parser. Return only valid JSON.")},
+                    {"role": "user", "content": (
+                        self._LOGISTICS_EXTRACTION_PROMPT
+                        + "\n\nDOCUMENT TEXT:\n" + raw_text[:6000])},
+                ],
+                max_tokens=2000,
+                temperature=0,
+                timeout=60,
+            )
+            if not raw:
+                return {"error": "AI parser returned empty response"}
+
+            raw = re.sub(r"^```json\s*", "", raw.strip())
+            raw = re.sub(r"\s*```$", "", raw.strip())
+            parsed = json.loads(raw)
+            parsed["extraction_method"] = "pdf_text_ai"
+            return parsed
+
+        except json.JSONDecodeError as e:
+            return {"error": f"AI parser returned invalid JSON: {e}"}
+        except Exception as e:
+            _logger.warning("AI text parse failed: %s", e)
+            return {"error": str(e)}
 
     # ---------------- PDF OCR ----------------
 
@@ -161,6 +214,12 @@ class PremaAIAttachment(models.Model):
             if not text:
                 return {"error": "OCR produced no text"}
 
+            from odoo.addons.prema_ai_auditor.services import deepseek_client
+            if deepseek_client.get_api_key(self.env):
+                result = self._parse_text_with_ai(text)
+                if result and "error" not in result:
+                    result["extraction_method"] = "pdf_ocr_ai"
+                    return result
             return {"raw_text": text[:4000], "extraction_method": "pdf_ocr_fallback"}
 
         except Exception as e:
@@ -195,92 +254,6 @@ class PremaAIAttachment(models.Model):
 
         except Exception as e:
             return {"error": f"OCR failed: {str(e)}"}
-
-    # ---------------- OPENAI VISION via /v1/responses ----------------
-
-    def _extract_via_openai_vision(self, file_b64: str, mimetype: str, api_key: str) -> Dict[str, Any]:
-        """
-        Extract invoice data using OpenAI Vision via the Responses API.
-        Endpoint: POST https://api.openai.com/v1/responses
-        """
-        try:
-            param = self.env["ir.config_parameter"].sudo()
-            model = param.get_param("prema_ai.vision_model", "gpt-4o")
-
-            prompt = (
-                "Extract invoice data from this document and return ONLY valid JSON with keys: "
-                "vendor_name, invoice_number, invoice_date, due_date, currency, "
-                "subtotal, tax_amount, total_amount, line_items "
-                "(list of {description, quantity, unit_price, amount}). "
-                "Use null for missing fields. No markdown, no explanation."
-            )
-
-            image_url = f"data:{mimetype};base64,{file_b64}"
-
-            response = requests.post(
-                "https://api.openai.com/v1/responses",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": model,
-                    "instructions": "You are an invoice data extraction engine. Return only valid JSON.",
-                    "input": [{
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": prompt},
-                            {"type": "input_image", "image_url": image_url},
-                        ],
-                    }],
-                    "max_output_tokens": 2000,
-                    "temperature": 0,
-                    "store": False,
-                },
-                timeout=120,
-            )
-            response.raise_for_status()
-            data = response.json()
-
-            # Extract text from response
-            raw = data.get("output_text", "")
-            if not raw:
-                # Fallback: walk output array
-                for item in data.get("output", []):
-                    if item.get("type") == "message" and item.get("content"):
-                        for block in item["content"]:
-                            if block.get("type") == "output_text" and block.get("text"):
-                                raw = block["text"]
-                                break
-                    if raw:
-                        break
-
-            if not raw:
-                return {"error": "Vision returned empty response"}
-
-            raw = raw.strip()
-
-            # Clean markdown fences
-            raw = re.sub(r"^```json\s*", "", raw)
-            raw = re.sub(r"\s*```$", "", raw)
-
-            parsed = json.loads(raw)
-            parsed["extraction_method"] = "openai_vision"
-            return parsed
-
-        except json.JSONDecodeError as e:
-            return {"error": f"Vision returned invalid JSON: {e}"}
-        except requests.exceptions.HTTPError as e:
-            body = ""
-            try:
-                body = e.response.text[:300] if e.response is not None else ""
-            except Exception:
-                pass
-            _logger.warning("Vision API HTTP error: %s — %s", e, body)
-            return {"error": f"Vision API error: {e}"}
-        except Exception as e:
-            _logger.warning("Vision extraction failed: %s", e)
-            return {"error": str(e)}
 
     # ---------------- HELPERS ----------------
 
@@ -353,14 +326,59 @@ class PremaAIAttachment(models.Model):
 
         return self._create_draft_bill(data)
 
+    def _build_reference(self, data: Dict[str, Any]) -> Optional[str]:
+        prefix_map = [
+            ("delivery_number", "DEL-"),
+            ("reference_number", "REF-"),
+            ("booking_number", "BK-"),
+            ("bol_number", "BOL-"),
+            ("po_number", "PO-"),
+        ]
+        known_prefixes = ("DEL-", "REF-", "BK-", "BOL-", "PO-")
+        parts = []
+        for key, prefix in prefix_map:
+            val = (data.get(key) or "").strip()
+            if not val:
+                continue
+            # Strip the prefix if the AI already included it in the value
+            upper = val.upper()
+            for kp in known_prefixes:
+                if upper.startswith(kp):
+                    val = val[len(kp):]
+                    break
+            if val:
+                parts.append(f"{prefix}{val}")
+        return " | ".join(parts) if parts else (data.get("invoice_number") or None)
+
+    def _build_line_description(self, data: Dict[str, Any]) -> str:
+        origin = (data.get("origin") or "").strip()
+        destination = (data.get("destination") or "").strip()
+        service_date = (data.get("service_date") or data.get("invoice_date") or "").strip()
+
+        parts = ["Freight / Delivery Service"]
+        if origin and destination:
+            parts.append(f"Route: {origin} → {destination}")
+        elif origin:
+            parts.append(f"Origin: {origin}")
+        elif destination:
+            parts.append(f"Destination: {destination}")
+        if service_date:
+            parts.append(f"Date: {service_date}")
+        return "\n".join(parts)
+
     def _create_draft_bill(self, data):
         try:
             partner = self._find_or_create_vendor(data.get("vendor_name"))
 
+            ref = self._build_reference(data)
+            line_desc = self._build_line_description(data)
+            _logger.info("AI bill create | method=%s ref=%s vendor=%s",
+                         data.get("extraction_method"), ref, data.get("vendor_name"))
+
             move_vals = {
                 "move_type": "in_invoice",
                 "partner_id": partner.id if partner else False,
-                "ref": data.get("invoice_number"),
+                "ref": ref,
                 "invoice_date": data.get("invoice_date") or False,
                 "invoice_date_due": data.get("due_date") or False,
                 "invoice_line_ids": [],
@@ -370,14 +388,14 @@ class PremaAIAttachment(models.Model):
             if lines:
                 for line in lines:
                     move_vals["invoice_line_ids"].append((0, 0, {
-                        "name": line.get("description", "Invoice line"),
+                        "name": line_desc,
                         "quantity": float(line.get("quantity", 1) or 1),
                         "price_unit": float(line.get("unit_price", 0) or line.get("amount", 0) or 0),
                     }))
             else:
                 total = float(data.get("total_amount", 0) or data.get("subtotal", 0) or 0)
                 move_vals["invoice_line_ids"].append((0, 0, {
-                    "name": data.get("invoice_number") or "Invoice line",
+                    "name": line_desc,
                     "quantity": 1,
                     "price_unit": total,
                 }))

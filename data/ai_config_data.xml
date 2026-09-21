@@ -1,16 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<odoo noupdate="1">
-    <!-- TASK 3: Model configuration parameters -->
+<odoo>
+
+<data noupdate="1">
+    <!-- AI model configuration -->
+    <!-- primary: cheapest text model — extraction, classification, KB ingestion -->
     <record id="param_primary_model" model="ir.config_parameter">
         <field name="key">prema_ai.primary_model</field>
-        <field name="value">gpt-5.3</field>
+        <field name="value">gpt-4.1-nano</field>
     </record>
+    <!-- fast: language quality — email writing, replies, user-facing responses -->
     <record id="param_fast_model" model="ir.config_parameter">
         <field name="key">prema_ai.fast_model</field>
-        <field name="value">gpt-5.2</field>
+        <field name="value">gpt-4o-mini</field>
     </record>
+    <!-- vision: image/attachment analysis — cheapest reliable vision model -->
     <record id="param_vision_model" model="ir.config_parameter">
         <field name="key">prema_ai.vision_model</field>
-        <field name="value">gpt-4o</field>
+        <field name="value">gpt-4o-mini</field>
     </record>
+</data>
+
+<data noupdate="0">
+    <!-- HERE Maps API — Logistics Estimate mode -->
+    <record id="param_here_api_key" model="ir.config_parameter">
+        <field name="key">prema_ai.here_api_key</field>
+        <field name="value"></field>
+    </record>
+    <record id="param_here_routing_mode" model="ir.config_parameter">
+        <field name="key">prema_ai.here_routing_mode</field>
+        <field name="value">truck</field>
+    </record>
+
+    <!-- Logistics Estimate — refueling detour thresholds -->
+    <record id="param_max_fuel_detour_km" model="ir.config_parameter">
+        <field name="key">prema_ai.max_fuel_detour_km</field>
+        <field name="value">15</field>
+    </record>
+    <record id="param_max_fuel_detour_min" model="ir.config_parameter">
+        <field name="key">prema_ai.max_fuel_detour_min</field>
+        <field name="value">20</field>
+    </record>
+
+    <!-- Logistics Estimate — costing parameters -->
+    <record id="param_driver_time_value_cad_hr" model="ir.config_parameter">
+        <field name="key">prema_ai.driver_time_value_cad_hr</field>
+        <field name="value">35</field>
+    </record>
+    <record id="param_min_fuel_savings_cad" model="ir.config_parameter">
+        <field name="key">prema_ai.min_fuel_savings_cad</field>
+        <field name="value">10</field>
+    </record>
+</data>
+
 </odoo>

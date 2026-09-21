@@ -4,7 +4,7 @@
         <field name="name">prema.ai.attachment.list</field>
         <field name="model">prema.ai.attachment</field>
         <field name="arch" type="xml">
-            <list string="AI Attachments">
+            <list string="Document Intelligence" delete="true">
                 <field name="original_filename"/>
                 <field name="mimetype"/>
                 <field name="state" widget="badge"
@@ -19,15 +19,12 @@
             </list>
         </field>
     </record>
-
     <record id="view_ai_attachment_form" model="ir.ui.view">
         <field name="name">prema.ai.attachment.form</field>
         <field name="model">prema.ai.attachment</field>
         <field name="arch" type="xml">
-            <form string="AI Attachment">
-                <header>
-                    <field name="state" widget="statusbar"/>
-                </header>
+            <form string="AI Attachment" delete="true">
+                <header><field name="state" widget="statusbar"/></header>
                 <sheet>
                     <group>
                         <group>
@@ -42,12 +39,8 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Extracted Data">
-                            <field name="extracted_data"/>
-                        </page>
-                        <page string="Error">
-                            <field name="error_message"/>
-                        </page>
+                        <page string="Extracted Data"><field name="extracted_data"/></page>
+                        <page string="Error"><field name="error_message"/></page>
                     </notebook>
                 </sheet>
             </form>

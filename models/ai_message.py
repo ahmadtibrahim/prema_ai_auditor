@@ -6,7 +6,7 @@ from odoo import models, fields
 class PremaAIMessage(models.Model):
     _name = "prema.ai.message"
     _description = "Prema AI Message"
-    _order = "create_date asc"
+    _order = "id asc"
 
     session_id = fields.Many2one(
         "prema.ai.session", required=True, ondelete="cascade", index=True,

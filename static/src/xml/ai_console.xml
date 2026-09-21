@@ -3,8 +3,12 @@
 <t t-name="prema_ai_console.AIConsole">
 <div class="o_ai_layout">
 
+    <!-- MOBILE OVERLAY -->
+    <div t-att-class="'o_ai_sidebar_overlay' + (state.sidebarOpen ? ' active' : '')"
+         t-on-click="toggleSidebar"/>
+
     <!-- SIDEBAR -->
-    <div class="o_ai_sidebar">
+    <div t-att-class="'o_ai_sidebar' + (state.sidebarOpen ? ' open' : '')">
         <button class="o_ai_new_btn" t-on-click="createNewSession">
             <i class="fa fa-plus me-2"/> New Chat
         </button>
@@ -27,18 +31,575 @@
     </div>
 
     <!-- CHAT AREA -->
-    <div class="o_ai_chat_area">
+    <div t-att-class="'o_ai_chat_area' + (state.isDragOver ? ' drag-over' : '')"
+         t-on-dragover="handleDragOver"
+         t-on-dragleave="handleDragLeave"
+         t-on-drop="handleDrop">
         <div class="o_ai_header">
+            <button class="o_ai_hamburger" t-on-click="toggleSidebar">
+                <i class="fa fa-bars"/>
+            </button>
             <i class="fa fa-robot"/>
             <span>Prema AI</span>
             <small>&#xB7; Odoo 18 Assistant</small>
+            <button t-att-class="'o_ai_estimator_toggle_btn' + (state.estimatorOpen ? ' active' : '')"
+                    t-on-click="toggleEstimator"
+                    title="Trip Cost Estimator">
+                <i class="fa fa-calculator"/>
+                <span>Estimator</span>
+            </button>
         </div>
+
+        <!-- Mode selector bar (hidden when estimator page is open) -->
+        <t t-if="state.activeSessionId and !state.estimatorOpen">
+            <div class="o_ai_mode_bar">
+                <t t-foreach="chatModes" t-as="mode" t-key="mode.id">
+                    <button
+                        t-att-class="'o_ai_mode_btn' + (state.chatMode === mode.id ? ' active' : '')"
+                        t-on-click="() => this.setChatMode(mode.id)"
+                        t-att-title="mode.label">
+                        <i t-att-class="mode.icon"/>
+                        <span t-esc="mode.label"/>
+                    </button>
+                </t>
+            </div>
+            <!-- Truck selector — visible only in Logistics Estimate mode -->
+            <t t-if="state.chatMode === 'logistics_estimate'">
+                <div class="o_ai_truck_bar">
+                    <i class="fa fa-truck o_ai_truck_icon"/>
+                    <span class="o_ai_truck_label">Truck:</span>
+                    <select class="o_ai_truck_select"
+                            t-on-change="onTruckChange">
+                        <option value="">— Auto Recommend —</option>
+                        <t t-foreach="state.availableTrucks" t-as="truck" t-key="truck.id">
+                            <option t-att-value="truck.id"
+                                    t-att-selected="state.selectedTruckId === truck.id">
+                                <t t-esc="truck.name"/><t t-if="truck.license_plate"> (<t t-esc="truck.license_plate"/>)</t>
+                            </option>
+                        </t>
+                    </select>
+                    <t t-if="state.selectedTruckId">
+                        <span class="o_ai_truck_badge">
+                            <i class="fa fa-check-circle"/> Selected
+                        </span>
+                    </t>
+                </div>
+            </t>
+        </t>
+
+        <!-- ── COST ESTIMATOR — full page ── -->
+        <t t-if="state.estimatorOpen">
+        <div class="o_ai_estimator_page">
+
+            <div class="o_ai_estimator_header">
+                <i class="fa fa-calculator"/>
+                <span>Trip Cost Estimator</span>
+                <button class="o_ai_estimator_close" t-on-click="toggleEstimator"
+                        title="Back to chat">
+                    <i class="fa fa-times"/> Close
+                </button>
+            </div>
+
+            <div class="o_ai_estimator_form">
+
+                <!-- ── Route Sheet Upload ── -->
+                <div class="o_ai_est_section_title" style="margin-top:0;">
+                    <i class="fa fa-file-text-o me-1"/>Route Sheet
+                    <small style="font-weight:400;opacity:.65;margin-left:6px;">drag &amp; drop or upload PDF/image to auto-extract stops</small>
+                </div>
+                <div t-att-class="'o_ai_est_dropzone' + (state.estimatorRouteSheetDragOver ? ' drag-over' : '')"
+                     t-on-dragover="onRouteSheetDragOver"
+                     t-on-dragleave="onRouteSheetDragLeave"
+                     t-on-drop="onRouteSheetDrop">
+                    <t t-if="state.estimatorIsExtractingStops">
+                        <i class="fa fa-spinner fa-spin me-2"/>Extracting stops from document…
+                    </t>
+                    <t t-else="">
+                        <i class="fa fa-cloud-upload me-2"/>Drop route sheet here or
+                        <label class="o_ai_est_upload_link" style="cursor:pointer;text-decoration:underline;">
+                            browse
+                            <input type="file" style="display:none"
+                                   accept=".pdf,.jpg,.jpeg,.png,.webp,.tiff"
+                                   t-on-change="onRouteSheetFileChange"/>
+                        </label>
+                    </t>
+                </div>
+                <t t-if="state.estimatorExtractError">
+                    <div class="o_ai_error_msg" style="margin:4px 0;">
+                        <i class="fa fa-exclamation-triangle me-1"/>
+                        <t t-esc="state.estimatorExtractError"/>
+                    </div>
+                </t>
+
+                <!-- ── Truck + Scheduling ── -->
+                <div class="o_ai_est_two_col">
+                    <div class="o_ai_est_col">
+                        <label class="o_ai_est_label"><i class="fa fa-truck me-1"/>Truck</label>
+                        <select class="o_ai_est_select" t-on-change="onEstimatorTruckChange">
+                            <option value="">— Select Truck —</option>
+                            <t t-foreach="state.availableTrucks" t-as="truck" t-key="truck.id">
+                                <option t-att-value="truck.id"
+                                        t-att-selected="state.estimatorTruckId === truck.id">
+                                    <t t-esc="truck.name"/>
+                                    <t t-if="truck.license_plate"> (<t t-esc="truck.license_plate"/>)</t>
+                                </option>
+                            </t>
+                        </select>
+                    </div>
+                    <div class="o_ai_est_col">
+                        <label class="o_ai_est_label"><i class="fa fa-calendar me-1"/>Scheduled Pickup</label>
+                        <input type="datetime-local" class="o_ai_est_input"
+                               t-att-value="state.estimatorScheduledAt"
+                               t-on-change="(ev) => { this.state.estimatorScheduledAt = ev.target.value; }"/>
+                    </div>
+                </div>
+
+                <!-- Check Availability button -->
+                <div class="o_ai_est_row" style="margin-top:6px;">
+                    <button class="o_ai_est_avail_btn"
+                            t-on-click="checkTruckAvailability"
+                            t-att-disabled="state.estimatorIsCheckingAvailability ? true : undefined">
+                        <i t-att-class="state.estimatorIsCheckingAvailability ? 'fa fa-spinner fa-spin me-1' : 'fa fa-search me-1'"/>
+                        <t t-if="state.estimatorIsCheckingAvailability">Checking…</t>
+                        <t t-else="">Check Truck Availability</t>
+                    </button>
+                </div>
+
+                <!-- Availability results panel -->
+                <t t-if="state.estimatorAvailabilityResult">
+                <div class="o_ai_est_avail_panel">
+                    <div class="o_ai_est_section_title" style="margin-bottom:6px;">
+                        <i class="fa fa-truck me-1"/>Fleet Availability
+                        <t t-if="state.estimatorAvailabilityResult.scheduled_start">
+                            <small style="font-weight:400;opacity:.6;margin-left:6px;">
+                                for <t t-esc="state.estimatorAvailabilityResult.scheduled_start.replace('T',' ').substring(0,16)"/>
+                            </small>
+                        </t>
+                    </div>
+                    <t t-foreach="state.estimatorAvailabilityResult.trucks" t-as="truck" t-key="truck.id">
+                    <div t-att-class="'o_ai_est_avail_row ' + truck.status">
+                        <span class="o_ai_est_avail_status">
+                            <i t-att-class="truck.status === 'available' ? 'fa fa-check-circle text-success' : (truck.status === 'busy' ? 'fa fa-times-circle text-danger' : 'fa fa-question-circle text-warning')"/>
+                        </span>
+                        <span class="o_ai_est_avail_name">
+                            <t t-esc="truck.name"/>
+                            <t t-if="truck.license_plate"> · <t t-esc="truck.license_plate"/></t>
+                        </span>
+                        <span class="o_ai_est_avail_dist" t-if="truck.distance_km !== null">
+                            <i class="fa fa-map-marker me-1"/><t t-esc="truck.distance_km"/> km away
+                        </span>
+                        <span class="o_ai_est_avail_driver" t-if="truck.driver_name">
+                            <i class="fa fa-user me-1"/><t t-esc="truck.driver_name"/>
+                        </span>
+                        <button class="o_ai_est_avail_select_btn"
+                                t-if="truck.status !== 'busy'"
+                                t-on-click="() => this.selectAvailableTruck(truck.id)">
+                            Select
+                        </button>
+                    </div>
+                    </t>
+                    <!-- Suggested slots when all busy -->
+                    <t t-if="state.estimatorAvailabilityResult.all_busy and state.estimatorAvailabilityResult.suggested_slots.length">
+                    <div class="o_ai_est_slots_panel">
+                        <div class="o_ai_est_section_title" style="font-size:11px;margin:8px 0 4px;">
+                            <i class="fa fa-clock-o me-1"/>All trucks busy — suggested alternative slots:
+                        </div>
+                        <t t-foreach="state.estimatorAvailabilityResult.suggested_slots" t-as="slot" t-key="slot_index">
+                            <div class="o_ai_est_slot_item">
+                                <i class="fa fa-calendar-o me-1"/>
+                                <span t-esc="slot.label"/>
+                                <button class="o_ai_est_slot_btn"
+                                        t-on-click="() => { this.state.estimatorScheduledAt = slot.start.substring(0,16); this.state.estimatorAvailabilityResult = null; }">
+                                    Use This Slot
+                                </button>
+                            </div>
+                        </t>
+                    </div>
+                    </t>
+                </div>
+                </t>
+
+                <!-- Stops list -->
+                <div class="o_ai_est_stops_section">
+                    <div class="o_ai_est_stops_header">
+                        <span class="o_ai_est_label" style="padding-top:0;">
+                            <i class="fa fa-map-signs me-1"/>Route Stops
+                        </span>
+                        <button class="o_ai_est_add_stop_btn"
+                                t-att-disabled="state.estimatorStops.length >= 10 ? true : undefined"
+                                t-on-click="addStop"
+                                title="Add a stop (max 10)">
+                            <i class="fa fa-plus me-1"/>Add Stop
+                        </button>
+                    </div>
+
+                    <t t-foreach="state.estimatorStops" t-as="stop" t-key="stop.id">
+                    <div class="o_ai_est_stop_card">
+
+                        <div class="o_ai_est_stop_row">
+                            <!-- Stop number badge -->
+                            <span class="o_ai_est_stop_num"><t t-esc="stop_index + 1"/></span>
+
+                            <!-- Type selector -->
+                            <select class="o_ai_est_stop_type"
+                                    t-on-change="(ev) => this.setStopType(stop_index, ev.target.value)">
+                                <option value="pickup"   t-att-selected="stop.type === 'pickup'">Pickup</option>
+                                <option value="dropoff"  t-att-selected="stop.type === 'dropoff'">Drop-off</option>
+                                <option value="break"    t-att-selected="stop.type === 'break'">Break</option>
+                                <option value="fuel"     t-att-selected="stop.type === 'fuel'">Fuel Stop</option>
+                                <option value="homebase" t-att-selected="stop.type === 'homebase'">Home Base</option>
+                            </select>
+
+                            <!-- Address autocomplete -->
+                            <div class="o_ai_est_stop_addr_col">
+                                <div class="o_ai_est_autocomplete">
+                                    <input class="o_ai_est_input"
+                                           t-att-value="stop.address"
+                                           t-att-placeholder="stop_index === 0 ? 'Origin — truck GPS or type an address…' : 'City, address, or postal code…'"
+                                           t-on-input="(ev) => this.onStopAddressInput(stop_index, ev.target.value)"/>
+                                    <t t-if="stop.suggestions.length > 0">
+                                        <div class="o_ai_est_suggestions">
+                                            <t t-foreach="stop.suggestions" t-as="s" t-key="s_index">
+                                                <div class="o_ai_est_suggestion_item"
+                                                     t-on-click="() => this.selectStopSuggestion(stop_index, s)">
+                                                    <i class="fa fa-map-pin me-1"/>
+                                                    <span t-esc="s.place_name"/>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Reorder + remove buttons -->
+                            <div class="o_ai_est_stop_actions">
+                                <button class="o_ai_est_move_btn"
+                                        t-att-disabled="stop_index === 0 ? true : undefined"
+                                        t-on-click="() => this.moveStopUp(stop_index)"
+                                        title="Move up">
+                                    <i class="fa fa-chevron-up"/>
+                                </button>
+                                <button class="o_ai_est_move_btn"
+                                        t-att-disabled="stop_index === state.estimatorStops.length - 1 ? true : undefined"
+                                        t-on-click="() => this.moveStopDown(stop_index)"
+                                        title="Move down">
+                                    <i class="fa fa-chevron-down"/>
+                                </button>
+                                <t t-if="state.estimatorStops.length > 1">
+                                    <button class="o_ai_est_remove_stop"
+                                            t-on-click="() => this.removeStop(stop_index)"
+                                            title="Remove stop">
+                                        <i class="fa fa-times"/>
+                                    </button>
+                                </t>
+                            </div>
+                        </div>
+
+                        <!-- Time window + liftgate + pallets + notes (below address) -->
+                        <div class="o_ai_est_stop_details">
+                            <div class="o_ai_est_stop_time_row">
+                                <label class="o_ai_est_detail_label"><i class="fa fa-calendar me-1"/>Date:</label>
+                                <input type="date" class="o_ai_est_input o_ai_est_input_date"
+                                       t-att-value="stop.stop_date"
+                                       t-on-change="(ev) => { this.state.estimatorStops[stop_index].stop_date = ev.target.value; }"/>
+                                <label class="o_ai_est_detail_label ms-2"><i class="fa fa-clock-o me-1"/>Window:</label>
+                                <input type="time" class="o_ai_est_input o_ai_est_input_time"
+                                       t-att-value="stop.time_window_start"
+                                       title="Earliest arrival time"
+                                       t-on-change="(ev) => { this.state.estimatorStops[stop_index].time_window_start = ev.target.value; }"/>
+                                <span style="opacity:.5;margin:0 2px;">–</span>
+                                <input type="time" class="o_ai_est_input o_ai_est_input_time"
+                                       t-att-value="stop.time_window_end"
+                                       title="Latest arrival time"
+                                       t-on-change="(ev) => { this.state.estimatorStops[stop_index].time_window_end = ev.target.value; }"/>
+                            </div>
+                            <div class="o_ai_est_stop_extras">
+                                <label class="o_ai_est_liftgate_label"
+                                       t-att-title="'Liftgate required — adds ~4 min per pallet to drive time'">
+                                    <input type="checkbox"
+                                           t-att-checked="stop.liftgate"
+                                           t-on-change="(ev) => this.setStopLiftgate(stop_index, ev.target.checked)"/>
+                                    Liftgate
+                                </label>
+                                <span class="o_ai_est_stop_extras_sep">·</span>
+                                <label class="o_ai_est_pallets_label">Pallets:</label>
+                                <input type="number" class="o_ai_est_stop_pallets"
+                                       min="0" max="99" step="1"
+                                       t-att-value="stop.pallets || ''"
+                                       placeholder="0"
+                                       t-on-input="(ev) => this.onStopPalletsInput(stop_index, ev)"/>
+                            </div>
+                            <div class="o_ai_est_stop_notes_row">
+                                <input class="o_ai_est_input o_ai_est_stop_notes_input"
+                                       placeholder="Stop instructions, contact, PO#…"
+                                       t-att-value="stop.stop_notes"
+                                       t-on-input="(ev) => { this.state.estimatorStops[stop_index].stop_notes = ev.target.value; }"/>
+                            </div>
+                        </div>
+
+                    </div>
+                    </t>
+                </div>
+
+                <!-- ── Trip Notes ── -->
+                <div class="o_ai_est_row">
+                    <label class="o_ai_est_label"><i class="fa fa-sticky-note-o me-1"/>Trip Notes / Instructions</label>
+                    <textarea class="o_ai_est_input o_ai_est_notes_area"
+                              placeholder="Special instructions, shipper contact, reference numbers, hazmat info…"
+                              rows="2"
+                              t-att-value="state.estimatorNotes"
+                              t-on-input="(ev) => { this.state.estimatorNotes = ev.target.value; }"/>
+                </div>
+
+                <!-- ── Costing Details ── -->
+                <div class="o_ai_est_costing_section">
+                    <div class="o_ai_est_section_title">
+                        <i class="fa fa-dollar me-1"/>Cost Parameters
+                        <small style="font-weight:400;opacity:.65;margin-left:6px;">pre-filled from truck · editable</small>
+                    </div>
+
+                    <div class="o_ai_est_cost_grid">
+
+                        <!-- Fuel Price -->
+                        <div class="o_ai_est_cost_param">
+                            <label class="o_ai_est_cost_label">
+                                <i class="fa fa-tint me-1"/>Fuel Price
+                            </label>
+                            <div class="o_ai_est_cost_input_wrap">
+                                <input type="text" inputmode="decimal"
+                                       class="o_ai_est_input o_ai_est_cost_input"
+                                       placeholder="0.000"
+                                       t-att-value="state.estimatorFuelPrice"
+                                       t-on-input="onFuelPriceInput"/>
+                                <button t-att-class="'o_ai_est_unit_toggle' + (state.estimatorFuelUnit === 'Gal' ? ' gal' : '')"
+                                        t-on-click="toggleFuelUnit"
+                                        title="Toggle between $/L and $/Gallon">
+                                    <t t-esc="state.estimatorFuelUnit"/>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Driver Rate -->
+                        <div class="o_ai_est_cost_param">
+                            <label class="o_ai_est_cost_label">
+                                <i class="fa fa-user me-1"/>Driver Rate
+                            </label>
+                            <div class="o_ai_est_cost_input_wrap">
+                                <input type="text" inputmode="decimal"
+                                       class="o_ai_est_input o_ai_est_cost_input"
+                                       placeholder="40.00"
+                                       t-att-value="state.estimatorDriverRate"
+                                       t-on-input="onDriverRateInput"/>
+                                <span class="o_ai_est_unit_label">/hr</span>
+                            </div>
+                        </div>
+
+                        <!-- Insurance (monthly) -->
+                        <div class="o_ai_est_cost_param">
+                            <label class="o_ai_est_cost_label">
+                                <i class="fa fa-shield me-1"/>Insurance /mo
+                            </label>
+                            <div class="o_ai_est_cost_input_wrap">
+                                <input type="text" inputmode="decimal"
+                                       class="o_ai_est_input o_ai_est_cost_input"
+                                       placeholder="From truck"
+                                       t-att-value="state.estimatorInsuranceMonthly"
+                                       t-on-input="onInsuranceInput"/>
+                                <span class="o_ai_est_unit_label">$</span>
+                            </div>
+                        </div>
+
+                        <!-- Maintenance (monthly) -->
+                        <div class="o_ai_est_cost_param">
+                            <label class="o_ai_est_cost_label">
+                                <i class="fa fa-wrench me-1"/>Maintenance /mo
+                            </label>
+                            <div class="o_ai_est_cost_input_wrap">
+                                <input type="text" inputmode="decimal"
+                                       class="o_ai_est_input o_ai_est_cost_input"
+                                       placeholder="From truck"
+                                       t-att-value="state.estimatorMaintenanceMonthly"
+                                       t-on-input="onMaintenanceInput"/>
+                                <span class="o_ai_est_unit_label">$</span>
+                            </div>
+                        </div>
+
+                        <!-- Margin % -->
+                        <div class="o_ai_est_cost_param">
+                            <label class="o_ai_est_cost_label">
+                                <i class="fa fa-percent me-1"/>Margin
+                            </label>
+                            <div class="o_ai_est_cost_input_wrap">
+                                <input type="text" inputmode="decimal"
+                                       class="o_ai_est_input o_ai_est_cost_input"
+                                       placeholder="20"
+                                       t-att-value="state.estimatorMarginPct"
+                                       t-on-input="onMarginInput"/>
+                                <span class="o_ai_est_unit_label">%</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Options row: routing + load -->
+                <div class="o_ai_est_row o_ai_est_options_row">
+                    <div class="o_ai_est_checkboxes">
+                        <label class="o_ai_est_checkbox_label">
+                            <input type="checkbox"
+                                   t-att-checked="state.estimatorAvoidTolls"
+                                   t-on-change="(ev) => { this.state.estimatorAvoidTolls = ev.target.checked; }"/>
+                            <i class="fa fa-road me-1"/>Avoid Tolls
+                        </label>
+                        <label class="o_ai_est_checkbox_label ms-3">
+                            <input type="checkbox"
+                                   t-att-checked="state.estimatorAllowCrossBorder"
+                                   t-on-change="(ev) => { this.state.estimatorAllowCrossBorder = ev.target.checked; }"/>
+                            <i class="fa fa-globe me-1"/>Allow USA Routing
+                        </label>
+                    </div>
+                    <div class="o_ai_est_load_inputs">
+                        <input type="number" class="o_ai_est_input o_ai_est_input_sm"
+                               placeholder="Weight (lbs)" min="0" step="100"
+                               t-on-input="onWeightInput"/>
+                        <input type="number" class="o_ai_est_input o_ai_est_input_sm"
+                               placeholder="Pallets" min="0" step="1"
+                               t-on-input="onPalletsInput"/>
+                    </div>
+                </div>
+
+                <!-- Calculate -->
+                <div class="o_ai_est_row o_ai_est_calc_row">
+                    <button class="o_ai_est_calc_btn"
+                            t-att-disabled="(state.estimatorIsLoading || !state.estimatorTruckId) ? true : undefined"
+                            t-on-click="runEstimate">
+                        <i t-att-class="state.estimatorIsLoading ? 'fa fa-spinner fa-spin me-1' : 'fa fa-calculator me-1'"/>
+                        <t t-if="state.estimatorIsLoading">Calculating…</t>
+                        <t t-else="">Calculate Cost</t>
+                    </button>
+                </div>
+
+            </div><!-- /form -->
+
+            <!-- Error -->
+            <t t-if="state.estimatorError">
+                <div class="o_ai_error_msg" style="margin:8px 16px;">
+                    <i class="fa fa-exclamation-triangle me-2"/>
+                    <t t-esc="state.estimatorError"/>
+                </div>
+            </t>
+
+            <!-- Results -->
+            <t t-if="state.estimatorResult">
+            <div class="o_ai_estimator_results">
+
+                <div class="o_ai_est_route_bar">
+                    <span class="o_ai_est_route_stat">
+                        <i class="fa fa-road me-1"/>
+                        <strong t-esc="state.estimatorResult.route.distance_km.toFixed(1)"/> km
+                    </span>
+                    <span class="o_ai_est_route_sep">·</span>
+                    <span class="o_ai_est_route_stat">
+                        <i class="fa fa-clock-o me-1"/>
+                        ~<strong t-esc="state.estimatorResult.route.duration_hrs.toFixed(1)"/> hrs drive
+                    </span>
+                    <span class="o_ai_est_route_sep">·</span>
+                    <span class="o_ai_est_route_stat" style="font-size:11px;opacity:.7;">
+                        <t t-esc="state.estimatorResult.route.origin_address"/> → <t t-esc="state.estimatorResult.route.destination_address"/>
+                    </span>
+                    <t t-if="state.estimatorResult.route.liftgate_hrs > 0">
+                        <span class="o_ai_est_route_sep">·</span>
+                        <span class="o_ai_est_route_stat o_ai_est_liftgate_tag">
+                            <i class="fa fa-truck me-1"/>+<t t-esc="Math.round(state.estimatorResult.route.liftgate_hrs * 60)"/> min liftgate
+                        </span>
+                    </t>
+                </div>
+
+                <table class="o_ai_est_cost_table">
+                    <tbody>
+                        <tr>
+                            <td><i class="fa fa-tint me-1"/>Fuel
+                                <small style="opacity:.6;font-size:10px;">
+                                    (<t t-esc="state.estimatorResult.params.effective_km_per_l"/> km/L
+                                    <t t-if="state.estimatorResult.params.fuel_load_factor !== 1">
+                                        · <t t-esc="((state.estimatorResult.params.fuel_load_factor - 1) * 100).toFixed(1)"/>% load adj
+                                    </t>
+                                    @ $<t t-esc="state.estimatorResult.params.fuel_price_per_l"/>/L)
+                                </small>
+                            </td>
+                            <td class="o_ai_est_cost_val">$<t t-esc="state.estimatorResult.costs.fuel.toFixed(2)"/></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fa fa-wrench me-1"/>Maintenance</td>
+                            <td class="o_ai_est_cost_val">$<t t-esc="state.estimatorResult.costs.maintenance.toFixed(2)"/></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fa fa-shield me-1"/>Insurance</td>
+                            <td class="o_ai_est_cost_val">$<t t-esc="state.estimatorResult.costs.insurance.toFixed(2)"/></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fa fa-user me-1"/>Driver
+                                <small style="opacity:.6;font-size:10px;">
+                                    ($<t t-esc="state.estimatorResult.params.driver_rate_per_hr"/>/hr)
+                                </small>
+                            </td>
+                            <td class="o_ai_est_cost_val">$<t t-esc="state.estimatorResult.costs.driver.toFixed(2)"/></td>
+                        </tr>
+                        <t t-if="state.estimatorResult.costs.weight_surcharge > 0">
+                        <tr class="o_ai_est_weight_surcharge_row">
+                            <td><i class="fa fa-balance-scale me-1"/>Weight Surcharge
+                                <small style="opacity:.6;font-size:10px;">
+                                    (<t t-esc="state.estimatorResult.params.load_weight_lbs"/> lbs ·
+                                    $<t t-esc="state.estimatorResult.params.weight_surcharge_per_cwt"/>/cwt over
+                                    <t t-esc="state.estimatorResult.params.weight_threshold_lbs"/> lbs)
+                                </small>
+                            </td>
+                            <td class="o_ai_est_cost_val">$<t t-esc="state.estimatorResult.costs.weight_surcharge.toFixed(2)"/></td>
+                        </tr>
+                        </t>
+                        <tr class="o_ai_est_total_row">
+                            <td><strong>Total Operating Cost</strong></td>
+                            <td class="o_ai_est_cost_val"><strong>$<t t-esc="state.estimatorResult.costs.total.toFixed(2)"/></strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="o_ai_est_rate_callout">
+                    <span class="o_ai_est_rate_label">
+                        Suggested Rate (<t t-esc="state.estimatorResult.costs.margin_pct"/>% margin)
+                    </span>
+                    <span class="o_ai_est_rate_value">
+                        $<t t-esc="state.estimatorResult.costs.suggested_rate.toFixed(2)"/>
+                    </span>
+                </div>
+
+                <div class="o_ai_est_action_btns">
+                    <button class="o_ai_confirm_btn" t-on-click="openEstimateInChat"
+                            t-att-disabled="!state.activeSessionId ? true : undefined"
+                            t-att-title="!state.activeSessionId ? 'Open a chat session first' : 'Send to AI chat'">
+                        <i class="fa fa-comments me-1"/>Open in Chat
+                    </button>
+                    <button class="o_ai_cancel_btn"
+                            t-on-click="() => { this.state.estimatorResult = null; this.state.estimatorError = null; }">
+                        <i class="fa fa-refresh me-1"/>New Estimate
+                    </button>
+                </div>
+
+            </div>
+            </t>
+
+        </div>
+        </t>
+        <!-- ── END ESTIMATOR PAGE ── -->
+
+        <!-- ── Normal chat (hidden when estimator is open) ── -->
+        <t t-if="!state.estimatorOpen">
 
         <t t-if="!state.activeSessionId">
             <div class="o_ai_empty">
                 <i class="fa fa-comments-o"/>
-                <p>Welcome to Prema AI Console</p>
-                <small>Create a new chat to get started</small>
+                <p>Welcome to Prema AI</p>
+                <small>Your CEO-level ERP assistant with full database access</small>
             </div>
         </t>
 
@@ -46,13 +607,15 @@
             <div class="o_ai_messages" t-ref="messages">
 
                 <t t-if="state.messages.length === 0 and !state.isLoading">
-                    <div style="text-align:center;color:#9ca3af;font-size:13px;padding:30px 0;">
-                        <i class="fa fa-magic" style="font-size:32px;color:#c4b5fd;display:block;margin-bottom:12px;"/>
-                        Ask me anything &#x2014; or upload a bill PDF/image<br/>
-                        <span style="color:#c4b5fd;margin-top:8px;display:block;">
-                            &#x201C;Show unpaid invoices&#x201D; &#xB7; &#x201C;Financial summary&#x201D; &#xB7; &#x201C;Check duplicate bills&#x201D;<br/>
-                            &#x201C;Debug stock module&#x201D; &#xB7; Upload a bill image to create a draft
-                        </span>
+                    <div class="o_ai_welcome">
+                        <i class="fa fa-magic"/>
+                        <p>I have full access to your ERP. Ask me anything:</p>
+                        <div class="o_ai_suggestions">
+                            <span>"Total diesel cost this year"</span>
+                            <span>"Show overdue invoices"</span>
+                            <span>"Find trucking companies in Brampton"</span>
+                            <span>"Generate expense report as PDF"</span>
+                        </div>
                     </div>
                 </t>
 
@@ -63,13 +626,21 @@
                                 <t t-if="msg.role === 'user'">You</t>
                                 <t t-else="">Prema AI</t>
                             </div>
-                            <div class="o_ai_msg_bubble" t-esc="msg.content"/>
+                            <div class="o_ai_msg_bubble"
+                                 t-out="this.formatMessage(msg.content)"/>
                         </div>
                     </t>
                 </t>
 
                 <t t-if="state.isLoading">
-                    <div class="o_ai_typing"><span/><span/><span/></div>
+                    <div class="o_ai_typing_row">
+                        <div class="o_ai_typing"><span/><span/><span/></div>
+                        <div class="o_ai_elapsed"
+                             t-att-title="'Waiting for Prema AI — seconds elapsed'">
+                            <i class="fa fa-hourglass-half me-1"/>
+                            <span t-esc="state.elapsed"/>s
+                        </div>
+                    </div>
                 </t>
 
                 <t t-if="state.errorMsg">
@@ -80,30 +651,145 @@
                 </t>
             </div>
 
+            <!-- ── PENDING ACTION BAR (Lead confirmation, etc.) ── -->
+            <t t-if="state.pendingAction and state.pendingAction.type === 'confirm_leads'">
+                <div class="o_ai_action_bar">
+                    <div class="o_ai_action_bar_header">
+                        <i class="fa fa-user-plus"/>
+                        <span>
+                            <strong t-esc="state.pendingAction.count"/> lead(s) ready to add to CRM
+                        </span>
+                    </div>
+
+                    <!-- Lead preview cards -->
+                    <div class="o_ai_lead_cards">
+                        <t t-foreach="state.pendingAction.leads" t-as="lead" t-key="lead.pending_key or lead_index">
+                            <div class="o_ai_lead_card">
+                                <div class="o_ai_lead_card_name">
+                                    <i class="fa fa-building-o me-1"/>
+                                    <strong t-esc="lead.company_name"/>
+                                </div>
+                                <t t-if="lead.contact_name or lead.title">
+                                    <div class="o_ai_lead_card_detail">
+                                        <i class="fa fa-user me-1"/>
+                                        <span t-esc="lead.contact_name or 'Contact TBD'"/>
+                                    </div>
+                                    <t t-if="lead.title">
+                                        <div class="o_ai_lead_card_detail">
+                                            <i class="fa fa-briefcase me-1"/>
+                                            <span t-esc="lead.title"/>
+                                        </div>
+                                    </t>
+                                </t>
+                                <t t-if="lead.city or lead.state">
+                                    <div class="o_ai_lead_card_detail">
+                                        <i class="fa fa-map-marker me-1"/>
+                                        <span t-esc="this.formatLeadLocation(lead)"/>
+                                    </div>
+                                </t>
+                                <t t-if="lead.email">
+                                    <div class="o_ai_lead_card_detail">
+                                        <i class="fa fa-envelope me-1"/>
+                                        <span t-esc="lead.email"/>
+                                    </div>
+                                </t>
+                                <t t-if="lead.phone">
+                                    <div class="o_ai_lead_card_detail">
+                                        <i class="fa fa-phone me-1"/>
+                                        <span t-esc="lead.phone"/>
+                                    </div>
+                                </t>
+                                <t t-if="lead.website">
+                                    <div class="o_ai_lead_card_detail">
+                                        <i class="fa fa-globe me-1"/>
+                                        <span t-esc="lead.website"/>
+                                    </div>
+                                </t>
+                                <t t-if="lead.status_note">
+                                    <div class="o_ai_lead_card_note" t-esc="lead.status_note"/>
+                                </t>
+                                <div class="o_ai_lead_card_actions">
+                                    <button class="o_ai_card_add_btn"
+                                            t-att-disabled="state.isConfirming ? true : undefined"
+                                            t-on-click="() => this.createSingleLead(lead.pending_key)">
+                                        <i class="fa fa-plus me-1"/>
+                                        <span t-esc="lead.import_label or 'Add to CRM'"/>
+                                    </button>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="o_ai_action_btns">
+                        <button class="o_ai_confirm_btn"
+                                t-att-disabled="state.isConfirming ? true : undefined"
+                                t-on-click="confirmCreateLeads">
+                            <i t-att-class="state.isConfirming ? 'fa fa-spinner fa-spin me-1' : 'fa fa-check me-1'"/>
+                            <t t-if="state.isConfirming">Creating...</t>
+                            <t t-else="">Create Leads</t>
+                        </button>
+                        <button class="o_ai_cancel_btn"
+                                t-att-disabled="state.isConfirming ? true : undefined"
+                                t-on-click="cancelPendingAction">
+                            <i class="fa fa-times me-1"/> Cancel
+                        </button>
+                        <span class="o_ai_action_note">
+                            No records will be created until you click "Create Leads"
+                        </span>
+                    </div>
+                </div>
+            </t>
+
+            <!-- File chips -->
+            <t t-if="state.pendingFiles.length > 0">
+                <div class="o_ai_file_chips">
+                    <t t-foreach="state.pendingFiles" t-as="pf" t-key="pf_index">
+                        <div class="o_ai_file_chip">
+                            <i class="fa fa-file-o me-1"/>
+                            <span t-esc="pf.name"/>
+                            <i class="fa fa-times o_ai_file_remove"
+                               t-on-click="() => this.removeFile(pf_index)"/>
+                        </div>
+                    </t>
+                </div>
+            </t>
+
             <!-- Input bar -->
             <div class="o_ai_input_bar">
                 <input type="file" t-ref="fileInput" style="display:none"
-                       accept=".pdf,.jpg,.jpeg,.png,.webp"
+                       accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tiff,.xlsx,.csv,.doc,.docx"
+                       multiple="multiple"
                        t-on-change="(ev) => this.onFileSelected(ev)"/>
 
                 <button class="o_ai_attach_btn" t-on-click="triggerFileUpload"
-                        title="Upload bill PDF or image"
+                        title="Attach files"
                         t-att-disabled="state.isLoading ? true : undefined">
                     <i class="fa fa-paperclip"/>
                 </button>
 
-                <textarea placeholder="Ask about invoices, bills, CRM... or upload a bill"
+                <textarea placeholder="Ask anything... (Ctrl+V to paste screenshot, or drag &amp; drop files here)"
                           t-model="state.input"
                           t-on-keydown="handleKeyDown"
+                          t-on-paste="handlePaste"
                           rows="1"
                           t-att-disabled="state.isLoading ? true : undefined"/>
 
+                <button t-att-class="'o_ai_mic_btn' + (state.isRecording ? ' recording' : '')"
+                        t-on-click="toggleRecording"
+                        title="Voice input"
+                        t-att-disabled="state.isLoading ? true : undefined">
+                    <i t-att-class="state.isRecording ? 'fa fa-stop' : 'fa fa-microphone'"/>
+                </button>
+
                 <button class="o_ai_send_btn" t-on-click="sendMessage"
-                        t-att-disabled="state.isLoading or !state.input ? true : undefined">
+                        t-att-disabled="state.isLoading or (!state.input and state.pendingFiles.length === 0) ? true : undefined">
                     <i t-att-class="state.isLoading ? 'fa fa-spinner fa-spin' : 'fa fa-paper-plane'"/>
                 </button>
             </div>
         </t>
+
+        </t><!-- ── end t-if="!state.estimatorOpen" ── -->
     </div>
 
 </div>

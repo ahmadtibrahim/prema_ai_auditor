@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <!-- ═══ CORRECTIONS LIST ═══ -->
     <record id="view_ai_correction_list" model="ir.ui.view">
         <field name="name">prema.ai.correction.list</field>
         <field name="model">prema.ai.correction</field>
@@ -8,35 +9,83 @@
                 <field name="create_date"/>
                 <field name="user_id"/>
                 <field name="context_type"/>
-                <field name="lesson"/>
-                <field name="tags"/>
+                <field name="vendor_name"/>
+                <field name="invoice_number"/>
+                <field name="total_amount"/>
+                <field name="state" widget="badge"
+                       decoration-info="state=='pending'"
+                       decoration-success="state=='applied'"/>
+                <field name="draft_move_id"/>
                 <field name="applied_count"/>
             </list>
         </field>
     </record>
 
+    <!-- ═══ CORRECTIONS FORM — Bill-style with Apply ═══ -->
     <record id="view_ai_correction_form" model="ir.ui.view">
         <field name="name">prema.ai.correction.form</field>
         <field name="model">prema.ai.correction</field>
         <field name="arch" type="xml">
             <form string="AI Correction">
+                <header>
+                    <button name="action_apply" type="object"
+                            string="Apply &amp; Create Draft Bill"
+                            class="btn-primary"
+                            invisible="state == 'applied'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
                 <sheet>
-                    <group>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_apply" type="object"
+                                class="oe_stat_button"
+                                icon="fa-file-text-o"
+                                invisible="not draft_move_id">
+                            <field name="draft_move_id" widget="statinfo" string="Draft Bill"/>
+                        </button>
+                    </div>
+                    <group string="Correction Info">
                         <group>
                             <field name="user_id"/>
                             <field name="context_type"/>
                             <field name="tags"/>
+                        </group>
+                        <group>
                             <field name="applied_count"/>
+                            <field name="draft_move_id" readonly="1"/>
                         </group>
                     </group>
+
+                    <separator string="Vendor Bill Data — Edit and Apply"/>
+                    <group>
+                        <group string="User Correction (editable)">
+                            <field name="vendor_name" placeholder="e.g. Nordic Insurance Company"/>
+                            <field name="invoice_number" placeholder="e.g. INV-2026-001"/>
+                            <field name="invoice_date"/>
+                            <field name="due_date"/>
+                            <field name="currency"/>
+                            <field name="subtotal"/>
+                            <field name="tax_amount"/>
+                            <field name="total_amount"/>
+                            <field name="account_code" placeholder="e.g. 510100"/>
+                            <field name="line_description" placeholder="Line item description"/>
+                        </group>
+                        <group string="AI Suggestion (read-only)">
+                            <field name="ai_vendor_name"/>
+                            <field name="ai_invoice_number"/>
+                            <field name="ai_invoice_date"/>
+                            <field name="ai_total_amount"/>
+                            <field name="ai_tax_amount"/>
+                        </group>
+                    </group>
+
                     <notebook>
-                        <page string="Lesson">
+                        <page string="Lesson Learned">
                             <field name="lesson"/>
                         </page>
-                        <page string="AI Suggestion">
+                        <page string="Raw AI Suggestion">
                             <field name="ai_suggestion"/>
                         </page>
-                        <page string="User Correction">
+                        <page string="Raw User Correction">
                             <field name="user_correction"/>
                         </page>
                     </notebook>

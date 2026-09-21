@@ -6,36 +6,7 @@
         <field name="tag">prema_ai_console</field>
     </record>
 
-    <record id="action_audit_dashboard" model="ir.actions.client">
-        <field name="name">Audit Dashboard</field>
-        <field name="tag">prema_audit_dashboard</field>
-    </record>
-
     <!-- ═══ Window Actions ═══ -->
-    <record id="action_ai_task_queue" model="ir.actions.act_window">
-        <field name="name">Task Queue</field>
-        <field name="res_model">prema.ai.task</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
-    <record id="action_audit_scans" model="ir.actions.act_window">
-        <field name="name">Audit Scans</field>
-        <field name="res_model">prema.audit.scan</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
-    <record id="action_audit_issues" model="ir.actions.act_window">
-        <field name="name">Audit Issues</field>
-        <field name="res_model">prema.audit.issue</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
-    <record id="action_audit_logs" model="ir.actions.act_window">
-        <field name="name">Audit Logs</field>
-        <field name="res_model">prema.ai.audit.log</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
     <record id="action_ai_attachments" model="ir.actions.act_window">
         <field name="name">Document Intelligence</field>
         <field name="res_model">prema.ai.attachment</field>
@@ -48,14 +19,8 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <record id="action_fix_logs" model="ir.actions.act_window">
-        <field name="name">Fix Logs</field>
-        <field name="res_model">prema.audit.fix.log</field>
-        <field name="view_mode">list</field>
-    </record>
-
     <record id="action_ai_settings" model="ir.actions.act_window">
-        <field name="name">AI Settings</field>
+        <field name="name">API &amp; Parameters</field>
         <field name="res_model">ir.config_parameter</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('key','like','prema_ai.%')]</field>
@@ -71,57 +36,27 @@
               action="action_ai_console"
               sequence="1"/>
 
-    <menuitem id="menu_ai_task_queue"
-              name="Task Queue"
-              parent="menu_prema_root"
-              action="action_ai_task_queue"
-              sequence="2"/>
-
-    <menuitem id="menu_audit_dashboard"
-              name="Audit Scanner"
-              parent="menu_prema_root"
-              action="action_audit_dashboard"
-              sequence="3"/>
-
-    <menuitem id="menu_audit_scans"
-              name="Audit Scans"
-              parent="menu_prema_root"
-              action="action_audit_scans"
-              sequence="4"/>
-
-    <menuitem id="menu_audit_issues"
-              name="Audit Issues"
-              parent="menu_prema_root"
-              action="action_audit_issues"
-              sequence="5"/>
-
-    <menuitem id="menu_audit_logs"
-              name="Audit Logs"
-              parent="menu_prema_root"
-              action="action_audit_logs"
-              sequence="6"/>
-
     <menuitem id="menu_ai_attachments"
               name="Document Intelligence"
               parent="menu_prema_root"
               action="action_ai_attachments"
-              sequence="7"/>
+              sequence="2"/>
 
     <menuitem id="menu_ai_corrections"
               name="Corrections"
               parent="menu_prema_root"
               action="action_ai_corrections"
-              sequence="8"/>
-
-    <menuitem id="menu_fix_logs"
-              name="Fix Logs"
-              parent="menu_prema_root"
-              action="action_fix_logs"
-              sequence="9"/>
+              sequence="3"/>
 
     <menuitem id="menu_ai_settings"
-              name="Settings"
+              name="API &amp; Parameters"
               parent="menu_prema_root"
               action="action_ai_settings"
+              sequence="98"/>
+
+    <menuitem id="menu_ai_chat_settings"
+              name="Chat Settings"
+              parent="menu_prema_root"
+              action="action_prema_ai_settings_server"
               sequence="99"/>
 </odoo>

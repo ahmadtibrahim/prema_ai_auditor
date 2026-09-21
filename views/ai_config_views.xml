@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+<data>
+
+<!-- Form view -->
+<record id="view_prema_ai_settings_form" model="ir.ui.view">
+    <field name="name">prema.ai.settings.form</field>
+    <field name="model">prema.ai.settings</field>
+    <field name="arch" type="xml">
+        <form string="Prema AI Settings">
+            <sheet>
+                <div class="oe_title">
+                    <h1>
+                        <i class="fa fa-cog" style="color:#4f46e5;margin-right:10px;"/>
+                        Prema AI Configuration
+                    </h1>
+                    <p style="color:#6b7280;font-size:13px;margin-top:4px;">
+                        Customise AI behaviour by mode. Changes take effect on the next message.
+                    </p>
+                </div>
+
+                <!-- ── General Instructions ── -->
+                <group string="General AI Instructions">
+                    <div class="o_field_widget" style="padding:0 8px;">
+                        <p style="color:#6b7280;font-size:12px;margin-bottom:8px;">
+                            Appended to every conversation regardless of mode.
+                        </p>
+                        <field name="custom_instructions"
+                               widget="text"
+                               placeholder="Example:&#10;- Always prioritise Ontario tax rules&#10;- Our standard fuel surcharge is 8¢/km&#10;- Default payment terms are net 30"
+                               style="min-height:120px;font-family:monospace;font-size:13px;"/>
+                    </div>
+                </group>
+
+                <!-- ── Rules Framework ── -->
+                <group string="Pricing Engine Rules">
+                    <div class="o_field_widget" style="padding:0 8px;">
+                        <p style="color:#6b7280;font-size:12px;margin-bottom:8px;">
+                            Applied in Pricing Review mode. Include rate tables, surcharges, minimum margins.
+                        </p>
+                        <field name="pricing_rules" widget="text"
+                               placeholder="Example:&#10;- Base rate: $2.10/km dry van, $2.75/km reefer&#10;- Minimum margin: 12%&#10;- Fuel surcharge: 8¢/km&#10;- Pallet fee: $15 per pallet over 26"
+                               style="min-height:100px;font-family:monospace;font-size:13px;"/>
+                    </div>
+                </group>
+
+                <group string="Lead Generation Instructions">
+                    <div class="o_field_widget" style="padding:0 8px;">
+                        <p style="color:#6b7280;font-size:12px;margin-bottom:8px;">
+                            Applied in Lead Generation mode. Target corridors, ideal shipper profile, outreach tone.
+                        </p>
+                        <field name="lead_gen_instructions" widget="text"
+                               placeholder="Example:&#10;- Target Ontario and Quebec corridors&#10;- Ideal shipper: food and beverage, 3+ loads/week&#10;- Outreach tone: professional, brief, value-focused"
+                               style="min-height:100px;font-family:monospace;font-size:13px;"/>
+                    </div>
+                </group>
+
+                <group string="Duplicate Prevention Rules">
+                    <div class="o_field_widget" style="padding:0 8px;">
+                        <p style="color:#6b7280;font-size:12px;margin-bottom:8px;">
+                            Criteria the AI uses when checking for duplicate leads or vendors.
+                        </p>
+                        <field name="duplicate_prevention_rules" widget="text"
+                               placeholder="Example:&#10;- Skip if company name already exists in Contacts&#10;- Skip if website domain already linked to a partner&#10;- Flag near-duplicates for manual review"
+                               style="min-height:80px;font-family:monospace;font-size:13px;"/>
+                    </div>
+                </group>
+
+                <group string="Routing / Dispatch Rules">
+                    <div class="o_field_widget" style="padding:0 8px;">
+                        <p style="color:#6b7280;font-size:12px;margin-bottom:8px;">
+                            Business rules for dispatch assignments and lane priorities.
+                        </p>
+                        <field name="routing_dispatch_rules" widget="text"
+                               placeholder="Example:&#10;- Prefer owner-operators for GTA lanes&#10;- Reefer loads require certified carrier&#10;- Cross-border requires valid bond number"
+                               style="min-height:80px;font-family:monospace;font-size:13px;"/>
+                    </div>
+                </group>
+
+                <group string="Cost Calculation Rules">
+                    <div class="o_field_widget" style="padding:0 8px;">
+                        <p style="color:#6b7280;font-size:12px;margin-bottom:8px;">
+                            Applied in Logistics Estimate mode. Define fuel rates, overhead costs, margins, and surcharges used in cost calculations.
+                        </p>
+                        <field name="cost_calc_rules" widget="text"
+                               placeholder="Example:&#10;- Diesel baseline: $1.65/L CAD&#10;- Overhead per km: $0.18&#10;- Driver hourly rate: $35 CAD&#10;- Minimum margin: 10%&#10;- Reefer surcharge: +$0.30/km"
+                               style="min-height:100px;font-family:monospace;font-size:13px;"/>
+                    </div>
+                </group>
+
+                <group string="Messaging Rules">
+                    <div class="o_field_widget" style="padding:0 8px;">
+                        <p style="color:#6b7280;font-size:12px;margin-bottom:8px;">
+                            Tone, sign-off, and formatting rules for AI-drafted emails and messages.
+                        </p>
+                        <field name="messaging_rules" widget="text"
+                               placeholder="Example:&#10;- Sign off with 'PremaFirm Logistics Team'&#10;- Keep emails under 150 words&#10;- Use formal tone for new prospects"
+                               style="min-height:80px;font-family:monospace;font-size:13px;"/>
+                    </div>
+                </group>
+
+                <!-- ── Source Document Library ── -->
+                <group string="Source Document Library">
+                    <div class="o_field_widget" style="padding:0 8px;">
+                        <p style="color:#6b7280;font-size:12px;margin-bottom:8px;">
+                            Upload PDFs, Word docs, or text files (rate cards, SOPs, broker agreements, compliance docs).
+                            The AI reads these as background context. Used as primary source in <strong>Document Q&amp;A</strong> mode.
+                        </p>
+                        <field name="source_library_enabled" widget="boolean_toggle"
+                               string="Enable Source Library (include files in every session)"/>
+                        <field name="source_attachment_ids"
+                               widget="many2many_binary"
+                               string="Attach Source Files"/>
+                    </div>
+                </group>
+
+                <!-- ── Attachment Limits ── -->
+                <group string="Attachment Limits (per message)">
+                    <group>
+                        <field name="max_files_per_chat" string="Max Files"/>
+                        <field name="max_images_per_chat" string="Max Images"/>
+                    </group>
+                    <group>
+                        <field name="max_total_upload_mb" string="Max Total Size (MB)"/>
+                        <field name="allowed_file_types" string="Allowed Extensions"/>
+                    </group>
+                </group>
+
+            </sheet>
+        </form>
+    </field>
+</record>
+
+<!-- Server action to open singleton -->
+<record id="action_prema_ai_settings_server" model="ir.actions.server">
+    <field name="name">Open AI Settings</field>
+    <field name="model_id" ref="model_prema_ai_settings"/>
+    <field name="state">code</field>
+    <field name="code">action = model.action_open()</field>
+</record>
+
+</data>
+</odoo>

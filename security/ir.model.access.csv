@@ -1,10 +1,29 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_prema_ai_session,prema.ai.session,model_prema_ai_session,base.group_user,1,1,1,0
 access_prema_ai_message,prema.ai.message,model_prema_ai_message,base.group_user,1,1,1,0
-access_prema_ai_attachment,prema.ai.attachment,model_prema_ai_attachment,base.group_user,1,1,1,0
-access_prema_audit_scan,prema.audit.scan,model_prema_audit_scan,base.group_user,1,1,1,0
-access_prema_audit_issue,prema.audit.issue,model_prema_audit_issue,base.group_user,1,1,1,0
-access_prema_audit_fix_log,prema.audit.fix.log,model_prema_audit_fix_log,base.group_user,1,1,1,0
+access_prema_ai_attachment,prema.ai.attachment,model_prema_ai_attachment,base.group_user,1,1,1,1
 access_prema_ai_correction,prema.ai.correction,model_prema_ai_correction,base.group_user,1,1,1,0
-access_prema_ai_task,prema.ai.task,model_prema_ai_task,base.group_user,1,1,1,0
-access_prema_ai_audit_log,prema.ai.audit.log,model_prema_ai_audit_log,base.group_user,1,1,1,0
+access_prema_ai_settings,prema.ai.settings,model_prema_ai_settings,base.group_user,1,1,1,0
+access_crm_lead_ai,crm.lead (AI access),crm.model_crm_lead,base.group_user,1,1,1,0
+access_ir_attachment_ai,ir.attachment (AI read),base.model_ir_attachment,base.group_user,1,0,1,0
+access_account_move_ai,account.move (AI read),account.model_account_move,base.group_user,1,0,0,0
+access_account_move_line_ai,account.move.line (AI read),account.model_account_move_line,base.group_user,1,0,0,0
+access_account_payment_ai,account.payment (AI read),account.model_account_payment,base.group_user,1,0,0,0
+access_account_journal_ai,account.journal (AI read),account.model_account_journal,base.group_user,1,0,0,0
+access_account_account_ai,account.account (AI read),account.model_account_account,base.group_user,1,0,0,0
+access_res_partner_ai,res.partner (AI read),base.model_res_partner,base.group_user,1,0,0,0
+access_res_country_ai,res.country (AI read),base.model_res_country,base.group_user,1,0,0,0
+access_project_project_ai,project.project (AI read),project.model_project_project,base.group_user,1,0,0,0
+access_project_task_ai,project.task (AI read),project.model_project_task,base.group_user,1,0,0,0
+access_purchase_order_ai,purchase.order (AI read),purchase.model_purchase_order,base.group_user,1,0,0,0
+access_purchase_order_line_ai,purchase.order.line (AI read),purchase.model_purchase_order_line,base.group_user,1,0,0,0
+access_sale_order_ai,sale.order (AI read),sale.model_sale_order,base.group_user,1,0,0,0
+access_sale_order_line_ai,sale.order.line (AI read),sale.model_sale_order_line,base.group_user,1,0,0,0
+access_fleet_vehicle_ai,fleet.vehicle (AI read),fleet.model_fleet_vehicle,base.group_user,1,0,0,0
+access_fleet_service_log_ai,fleet.vehicle.log.services (AI read),fleet.model_fleet_vehicle_log_services,base.group_user,1,0,0,0
+access_hr_employee_ai,hr.employee (AI read),hr.model_hr_employee,base.group_user,1,0,0,0
+access_stock_picking_ai,stock.picking (AI read),stock.model_stock_picking,base.group_user,1,0,0,0
+access_stock_move_ai,stock.move (AI read),stock.model_stock_move,base.group_user,1,0,0,0
+access_product_template_ai,product.template (AI read),product.model_product_template,base.group_user,1,0,0,0
+access_product_product_ai,product.product (AI read),product.model_product_product,base.group_user,1,0,0,0
+access_prema_ai_crm_action,prema.ai.crm.action,model_prema_ai_crm_action,base.group_user,1,1,1,0
